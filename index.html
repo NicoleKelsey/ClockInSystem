@@ -464,7 +464,7 @@
 // ╔══════════════════════════════════════════════════════╗
 // ║  CONFIGURATION — paste your Apps Script URL below   ║
 // ╚══════════════════════════════════════════════════════╝
-const SCRIPT_URL = 'YOUR_APPS_SCRIPT_URL_HERE';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxJIKpikne5uMWm7e_X8UovdIe_wEAfOfQlPep5vm3GJ1Z7tLE0hve861hXvisTLxI/exec';
 // Example: 'https://script.google.com/macros/s/AKfycb.../exec'
 
 const ADMIN_PIN  = '0000'; // Change this to your preferred admin PIN
@@ -489,7 +489,7 @@ let activeSession = null;
 // ════════════════════════════════════════════════════════
 
 async function api(params) {
-  if (!SCRIPT_URL || SCRIPT_URL === 'YOUR_APPS_SCRIPT_URL_HERE') {
+  if (!SCRIPT_URL || SCRIPT_URL === 'https://script.google.com/macros/s/AKfycbxJIKpikne5uMWm7e_X8UovdIe_wEAfOfQlPep5vm3GJ1Z7tLE0hve861hXvisTLxI/exec') {
     throw new Error('SCRIPT_URL not configured');
   }
   const url = SCRIPT_URL + '?' + new URLSearchParams(params).toString();
