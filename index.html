@@ -6,7 +6,6 @@
 <title>WorkTrack – Clock In & Payroll</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Sora:wght@300;400;600;700;800&display=swap" rel="stylesheet" />
 <style>
-  /* ── CSS Variables ── */
   :root {
     --bg: #0d0f14;
     --surface: #161a22;
@@ -33,7 +32,6 @@
     overflow-x: hidden;
   }
 
-  /* ── Noise texture overlay ── */
   body::before {
     content: '';
     position: fixed;
@@ -44,17 +42,35 @@
     opacity: 0.4;
   }
 
-  /* ── Screen system ── */
+  /* Loading overlay */
+  #loading-overlay {
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    transition: opacity 0.4s;
+  }
+  #loading-overlay.hidden { opacity: 0; pointer-events: none; }
+  .loading-logo { font-size: 13px; font-weight: 700; letter-spacing: 4px; text-transform: uppercase; color: var(--accent); font-family: var(--font-mono); }
+  .loading-spinner {
+    width: 32px; height: 32px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
   .screen { display: none; position: relative; z-index: 1; }
   .screen.active { display: block; }
 
-  /* ─────────────────────────────────────────────
-     CLOCK-IN SCREEN
-  ───────────────────────────────────────────── */
-  #clockin-screen {
-    min-height: 100vh;
-    padding: 0 0 40px;
-  }
+  /* CLOCK-IN SCREEN */
+  #clockin-screen { min-height: 100vh; padding: 0 0 40px; }
 
   .ci-header {
     background: linear-gradient(135deg, #0d1520 0%, #111827 100%);
@@ -64,64 +80,18 @@
     position: relative;
   }
 
-  .ci-header .logo {
-    font-size: 13px;
-    font-weight: 700;
-    letter-spacing: 4px;
-    text-transform: uppercase;
-    color: var(--accent);
-    font-family: var(--font-mono);
-    margin-bottom: 4px;
-  }
+  .ci-header .logo { font-size: 13px; font-weight: 700; letter-spacing: 4px; text-transform: uppercase; color: var(--accent); font-family: var(--font-mono); margin-bottom: 4px; }
+  .ci-header h1 { font-size: 28px; font-weight: 800; color: var(--text); line-height: 1.1; }
+  .ci-header .live-time { font-family: var(--font-mono); font-size: 14px; color: var(--muted); margin-top: 8px; letter-spacing: 1px; }
 
-  .ci-header h1 {
-    font-size: 28px;
-    font-weight: 800;
-    color: var(--text);
-    line-height: 1.1;
-  }
-
-  .ci-header .live-time {
-    font-family: var(--font-mono);
-    font-size: 14px;
-    color: var(--muted);
-    margin-top: 8px;
-    letter-spacing: 1px;
-  }
-
-  /* Admin link hidden in bottom right of header */
-  .admin-link {
-    position: absolute;
-    bottom: 10px;
-    right: 16px;
-    font-size: 10px;
-    color: var(--border);
-    cursor: pointer;
-    user-select: none;
-    transition: color 0.2s;
-    font-family: var(--font-mono);
-  }
+  .admin-link { position: absolute; bottom: 10px; right: 16px; font-size: 10px; color: var(--border); cursor: pointer; user-select: none; transition: color 0.2s; font-family: var(--font-mono); }
   .admin-link:hover { color: var(--muted); }
 
   .ci-body { padding: 24px 16px; max-width: 480px; margin: 0 auto; }
 
-  .section-label {
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 3px;
-    text-transform: uppercase;
-    color: var(--muted);
-    font-family: var(--font-mono);
-    margin-bottom: 14px;
-  }
+  .section-label { font-size: 11px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: var(--muted); font-family: var(--font-mono); margin-bottom: 14px; }
 
-  /* Employee cards */
-  .employee-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
-    margin-bottom: 28px;
-  }
+  .employee-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 28px; }
 
   .emp-card {
     background: var(--surface);
@@ -134,66 +104,18 @@
     position: relative;
     overflow: hidden;
   }
-
-  .emp-card::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(135deg, var(--accent) 0%, transparent 60%);
-    opacity: 0;
-    transition: opacity 0.2s;
-  }
-
+  .emp-card::before { content: ''; position: absolute; inset: 0; background: linear-gradient(135deg, var(--accent) 0%, transparent 60%); opacity: 0; transition: opacity 0.2s; }
   .emp-card:hover { border-color: var(--accent); transform: translateY(-2px); }
   .emp-card:hover::before { opacity: 0.07; }
   .emp-card:active { transform: translateY(0); }
 
-  .emp-avatar {
-    width: 48px;
-    height: 48px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, var(--accent2), var(--accent));
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 20px;
-    font-weight: 700;
-    margin: 0 auto 10px;
-    color: var(--bg);
-    position: relative;
-    z-index: 1;
-  }
-
-  .emp-name {
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--text);
-    position: relative;
-    z-index: 1;
-  }
-
-  .emp-status {
-    font-size: 11px;
-    font-family: var(--font-mono);
-    margin-top: 5px;
-    position: relative;
-    z-index: 1;
-  }
-
+  .emp-avatar { width: 48px; height: 48px; border-radius: 50%; background: linear-gradient(135deg, var(--accent2), var(--accent)); display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 700; margin: 0 auto 10px; color: var(--bg); position: relative; z-index: 1; }
+  .emp-name { font-size: 14px; font-weight: 600; color: var(--text); position: relative; z-index: 1; }
+  .emp-status { font-size: 11px; font-family: var(--font-mono); margin-top: 5px; position: relative; z-index: 1; }
   .emp-status.in { color: var(--accent); }
   .emp-status.out { color: var(--muted); }
 
-  /* Modal overlay */
-  .modal-overlay {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.75);
-    z-index: 100;
-    align-items: flex-end;
-    justify-content: center;
-    backdrop-filter: blur(4px);
-  }
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 100; align-items: flex-end; justify-content: center; backdrop-filter: blur(4px); }
   .modal-overlay.open { display: flex; }
 
   .modal-sheet {
@@ -207,88 +129,26 @@
     animation: slideUp 0.3s cubic-bezier(0.34,1.56,0.64,1);
   }
 
-  @keyframes slideUp {
-    from { transform: translateY(100%); }
-    to   { transform: translateY(0); }
-  }
+  @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
 
-  .modal-handle {
-    width: 40px;
-    height: 4px;
-    background: var(--border);
-    border-radius: 2px;
-    margin: -12px auto 20px;
-  }
+  .modal-handle { width: 40px; height: 4px; background: var(--border); border-radius: 2px; margin: -12px auto 20px; }
+  .modal-title { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+  .modal-subtitle { font-size: 13px; color: var(--muted); margin-bottom: 24px; font-family: var(--font-mono); }
 
-  .modal-title {
-    font-size: 22px;
-    font-weight: 700;
-    margin-bottom: 6px;
-  }
-
-  .modal-subtitle {
-    font-size: 13px;
-    color: var(--muted);
-    margin-bottom: 24px;
-    font-family: var(--font-mono);
-  }
-
-  /* PIN display */
-  .pin-dots {
-    display: flex;
-    gap: 10px;
-    justify-content: center;
-    margin-bottom: 20px;
-  }
-
-  .pin-dot {
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    border: 2px solid var(--border);
-    transition: all 0.15s;
-  }
+  .pin-dots { display: flex; gap: 10px; justify-content: center; margin-bottom: 20px; }
+  .pin-dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--border); transition: all 0.15s; }
   .pin-dot.filled { background: var(--accent); border-color: var(--accent); }
 
-  /* Numpad */
-  .numpad {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
-    margin-bottom: 20px;
-  }
-
-  .numpad-btn {
-    background: var(--surface2);
-    border: 1.5px solid var(--border);
-    border-radius: 12px;
-    padding: 18px 10px;
-    font-size: 22px;
-    font-weight: 600;
-    color: var(--text);
-    cursor: pointer;
-    transition: background 0.15s, border-color 0.15s, transform 0.1s;
-    font-family: var(--font-mono);
-    text-align: center;
-  }
+  .numpad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px; }
+  .numpad-btn { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 12px; padding: 18px 10px; font-size: 22px; font-weight: 600; color: var(--text); cursor: pointer; transition: background 0.15s, border-color 0.15s, transform 0.1s; font-family: var(--font-mono); text-align: center; }
   .numpad-btn:hover { background: var(--border); border-color: var(--accent); }
   .numpad-btn:active { transform: scale(0.95); }
   .numpad-btn.del { color: var(--warn); font-size: 18px; }
   .numpad-btn.clear { color: var(--danger); font-size: 14px; }
 
-  /* Inputs & selects */
-  label.field-label {
-    display: block;
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    color: var(--muted);
-    font-family: var(--font-mono);
-    margin-bottom: 8px;
-  }
+  label.field-label { display: block; font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); font-family: var(--font-mono); margin-bottom: 8px; }
 
-  select, input[type="text"], input[type="number"], input[type="password"] {
+  select, input[type="text"], input[type="number"], input[type="password"], input[type="date"] {
     width: 100%;
     background: var(--surface2);
     border: 1.5px solid var(--border);
@@ -305,41 +165,11 @@
   select:focus, input:focus { border-color: var(--accent); }
   select option { background: var(--surface2); }
 
-  /* Day type toggle */
-  .day-toggle {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 20px;
-  }
-
-  .day-btn {
-    flex: 1;
-    padding: 14px;
-    border-radius: 10px;
-    border: 1.5px solid var(--border);
-    background: var(--surface2);
-    color: var(--muted);
-    font-size: 15px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-    text-align: center;
-  }
+  .day-toggle { display: flex; gap: 10px; margin-bottom: 20px; }
+  .day-btn { flex: 1; padding: 14px; border-radius: 10px; border: 1.5px solid var(--border); background: var(--surface2); color: var(--muted); font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.2s; text-align: center; }
   .day-btn.selected { background: var(--accent); border-color: var(--accent); color: var(--bg); }
 
-  /* Buttons */
-  .btn {
-    width: 100%;
-    padding: 16px;
-    border-radius: 12px;
-    border: none;
-    font-size: 16px;
-    font-weight: 700;
-    cursor: pointer;
-    transition: all 0.2s;
-    font-family: var(--font-main);
-    letter-spacing: 0.5px;
-  }
+  .btn { width: 100%; padding: 16px; border-radius: 12px; border: none; font-size: 16px; font-weight: 700; cursor: pointer; transition: all 0.2s; font-family: var(--font-main); letter-spacing: 0.5px; }
   .btn:active { transform: scale(0.98); }
   .btn-primary { background: var(--accent); color: var(--bg); }
   .btn-primary:hover { filter: brightness(1.1); }
@@ -348,257 +178,66 @@
   .btn-secondary { background: var(--surface2); border: 1.5px solid var(--border); color: var(--muted); }
   .btn-secondary:hover { border-color: var(--accent); color: var(--text); }
 
-  /* Status card (when clocked in) */
-  .status-card {
-    background: linear-gradient(135deg, rgba(61,232,160,0.1) 0%, rgba(61,159,232,0.05) 100%);
-    border: 1.5px solid var(--accent);
-    border-radius: var(--card-radius);
-    padding: 22px;
-    margin-bottom: 20px;
-  }
-  .status-card .status-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-    background: rgba(61,232,160,0.15);
-    border: 1px solid rgba(61,232,160,0.3);
-    border-radius: 20px;
-    padding: 5px 12px;
-    font-size: 12px;
-    font-weight: 700;
-    color: var(--accent);
-    font-family: var(--font-mono);
-    margin-bottom: 14px;
-  }
-  .status-card .status-badge::before {
-    content: '';
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--accent);
-    animation: pulse 1.5s ease-in-out infinite;
-  }
+  .status-card { background: linear-gradient(135deg, rgba(61,232,160,0.1) 0%, rgba(61,159,232,0.05) 100%); border: 1.5px solid var(--accent); border-radius: var(--card-radius); padding: 22px; margin-bottom: 20px; }
+  .status-card .status-badge { display: inline-flex; align-items: center; gap: 7px; background: rgba(61,232,160,0.15); border: 1px solid rgba(61,232,160,0.3); border-radius: 20px; padding: 5px 12px; font-size: 12px; font-weight: 700; color: var(--accent); font-family: var(--font-mono); margin-bottom: 14px; }
+  .status-card .status-badge::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: pulse 1.5s ease-in-out infinite; }
   @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
   .status-card .status-emp { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
   .status-card .status-detail { font-size: 13px; color: var(--muted); font-family: var(--font-mono); }
 
-  /* Error message */
-  .error-msg {
-    background: rgba(232,79,61,0.15);
-    border: 1px solid rgba(232,79,61,0.4);
-    border-radius: 8px;
-    padding: 12px 16px;
-    font-size: 14px;
-    color: var(--danger);
-    margin-bottom: 14px;
-    display: none;
-  }
+  .error-msg { background: rgba(232,79,61,0.15); border: 1px solid rgba(232,79,61,0.4); border-radius: 8px; padding: 12px 16px; font-size: 14px; color: var(--danger); margin-bottom: 14px; display: none; }
   .error-msg.show { display: block; }
 
-  /* ─────────────────────────────────────────────
-     ADMIN DASHBOARD
-  ───────────────────────────────────────────── */
-  #admin-screen {
-    min-height: 100vh;
-    background: var(--bg);
-  }
+  /* ADMIN */
+  #admin-screen { min-height: 100vh; background: var(--bg); }
 
-  .admin-nav {
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    padding: 16px 24px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    position: sticky;
-    top: 0;
-    z-index: 50;
-  }
+  .admin-nav { background: var(--surface); border-bottom: 1px solid var(--border); padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 50; }
+  .admin-nav .nav-logo { font-size: 12px; font-weight: 700; letter-spacing: 3px; color: var(--accent); font-family: var(--font-mono); }
+  .admin-nav .nav-title { font-size: 16px; font-weight: 700; }
 
-  .admin-nav .nav-logo {
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 3px;
-    color: var(--accent);
-    font-family: var(--font-mono);
-  }
-
-  .admin-nav .nav-title {
-    font-size: 16px;
-    font-weight: 700;
-  }
-
-  .nav-btn {
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 8px 16px;
-    color: var(--muted);
-    font-size: 13px;
-    cursor: pointer;
-    font-family: var(--font-main);
-    transition: all 0.2s;
-  }
+  .nav-btn { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 16px; color: var(--muted); font-size: 13px; cursor: pointer; font-family: var(--font-main); transition: all 0.2s; }
   .nav-btn:hover { color: var(--text); border-color: var(--accent); }
 
   .admin-body { padding: 24px; max-width: 1200px; margin: 0 auto; }
 
-  /* Tabs */
-  .tabs {
-    display: flex;
-    gap: 6px;
-    margin-bottom: 28px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 5px;
-  }
-
-  .tab {
-    flex: 1;
-    padding: 12px 10px;
-    border-radius: 9px;
-    border: none;
-    background: transparent;
-    color: var(--muted);
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-    font-family: var(--font-main);
-    text-align: center;
-  }
+  .tabs { display: flex; gap: 6px; margin-bottom: 28px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 5px; }
+  .tab { flex: 1; padding: 12px 10px; border-radius: 9px; border: none; background: transparent; color: var(--muted); font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; font-family: var(--font-main); text-align: center; }
   .tab.active { background: var(--accent); color: var(--bg); }
 
   .tab-pane { display: none; }
   .tab-pane.active { display: block; }
 
-  /* Stats row */
-  .stats-row {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 14px;
-    margin-bottom: 28px;
-  }
-
-  .stat-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--card-radius);
-    padding: 20px;
-  }
+  .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 28px; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--card-radius); padding: 20px; }
   .stat-label { font-size: 11px; font-weight: 700; letter-spacing: 2px; color: var(--muted); font-family: var(--font-mono); text-transform: uppercase; margin-bottom: 8px; }
   .stat-value { font-size: 28px; font-weight: 800; color: var(--text); }
   .stat-value.green { color: var(--accent); }
   .stat-value.blue { color: var(--accent2); }
   .stat-value.orange { color: var(--warn); }
 
-  /* Filter row */
-  .filter-row {
-    display: flex;
-    gap: 12px;
-    margin-bottom: 18px;
-    flex-wrap: wrap;
-    align-items: flex-end;
-  }
+  .filter-row { display: flex; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; align-items: flex-end; }
+  .filter-row select, .filter-row input { flex: 1; min-width: 140px; margin-bottom: 0; }
 
-  .filter-row select, .filter-row input {
-    flex: 1;
-    min-width: 140px;
-    margin-bottom: 0;
-  }
-
-  /* Table */
-  .table-wrap {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--card-radius);
-    overflow: auto;
-    margin-bottom: 24px;
-  }
-
+  .table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--card-radius); overflow: auto; margin-bottom: 24px; }
   table { width: 100%; border-collapse: collapse; }
-
-  thead th {
-    background: var(--surface2);
-    padding: 13px 16px;
-    text-align: left;
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    color: var(--muted);
-    font-family: var(--font-mono);
-    white-space: nowrap;
-    border-bottom: 1px solid var(--border);
-  }
-
-  tbody tr {
-    border-bottom: 1px solid var(--border);
-    transition: background 0.15s;
-  }
+  thead th { background: var(--surface2); padding: 13px 16px; text-align: left; font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); font-family: var(--font-mono); white-space: nowrap; border-bottom: 1px solid var(--border); }
+  tbody tr { border-bottom: 1px solid var(--border); transition: background 0.15s; }
   tbody tr:last-child { border-bottom: none; }
   tbody tr:hover { background: var(--surface2); }
-
-  tbody td {
-    padding: 12px 16px;
-    font-size: 14px;
-    white-space: nowrap;
-  }
-
+  tbody td { padding: 12px 16px; font-size: 14px; white-space: nowrap; }
   td.mono { font-family: var(--font-mono); font-size: 13px; }
   td.green { color: var(--accent); font-family: var(--font-mono); }
   td.blue { color: var(--accent2); font-family: var(--font-mono); }
   td.orange { color: var(--warn); font-family: var(--font-mono); }
-  td.red { color: var(--danger); font-family: var(--font-mono); }
 
-  .badge {
-    display: inline-block;
-    padding: 3px 10px;
-    border-radius: 20px;
-    font-size: 11px;
-    font-weight: 700;
-    font-family: var(--font-mono);
-  }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; font-family: var(--font-mono); }
   .badge-full { background: rgba(61,232,160,0.15); color: var(--accent); border: 1px solid rgba(61,232,160,0.3); }
   .badge-half { background: rgba(232,131,61,0.15); color: var(--warn); border: 1px solid rgba(232,131,61,0.3); }
 
-  /* Employee management */
-  .emp-mgmt-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 16px;
-    margin-bottom: 24px;
-  }
-
-  .emp-mgmt-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--card-radius);
-    padding: 20px;
-  }
-
-  .emp-mgmt-card .emp-header {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 16px;
-  }
-
-  .emp-mgmt-card .emp-ava {
-    width: 44px;
-    height: 44px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, var(--accent2), var(--accent));
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 700;
-    font-size: 18px;
-    color: var(--bg);
-    flex-shrink: 0;
-  }
-
+  .emp-mgmt-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; margin-bottom: 24px; }
+  .emp-mgmt-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--card-radius); padding: 20px; }
+  .emp-mgmt-card .emp-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+  .emp-mgmt-card .emp-ava { width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(135deg, var(--accent2), var(--accent)); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 18px; color: var(--bg); flex-shrink: 0; }
   .emp-mgmt-card .emp-info h3 { font-size: 16px; font-weight: 700; }
   .emp-mgmt-card .emp-info p { font-size: 12px; color: var(--muted); font-family: var(--font-mono); }
 
@@ -606,128 +245,42 @@
   .field-row > * { flex: 1; }
   .field-row .btn { margin-bottom: 16px; padding: 14px 10px; }
 
-  /* Payroll summary */
-  .payroll-row {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 16px;
-    margin-bottom: 28px;
-  }
-
-  .payroll-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--card-radius);
-    padding: 20px;
-  }
-
-  .payroll-card h3 {
-    font-size: 16px;
-    font-weight: 700;
-    margin-bottom: 16px;
-    padding-bottom: 12px;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .pay-line {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 8px 0;
-    font-size: 14px;
-    border-bottom: 1px solid var(--border);
-  }
+  .payroll-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; margin-bottom: 28px; }
+  .payroll-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--card-radius); padding: 20px; }
+  .payroll-card h3 { font-size: 16px; font-weight: 700; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+  .pay-line { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; font-size: 14px; border-bottom: 1px solid var(--border); }
   .pay-line:last-child { border-bottom: none; }
   .pay-line .pay-key { color: var(--muted); }
   .pay-line .pay-val { font-family: var(--font-mono); font-weight: 600; }
   .pay-line.total .pay-key { font-weight: 700; color: var(--text); }
   .pay-line.total .pay-val { color: var(--accent); font-size: 18px; }
 
-  /* Loan section */
-  .loan-form {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--card-radius);
-    padding: 24px;
-    margin-bottom: 24px;
-  }
+  .loan-form { background: var(--surface); border: 1px solid var(--border); border-radius: var(--card-radius); padding: 24px; margin-bottom: 24px; }
   .loan-form h3 { font-size: 16px; font-weight: 700; margin-bottom: 20px; }
   .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
   @media (max-width: 500px) { .form-grid { grid-template-columns: 1fr; } }
 
   .loan-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 24px; }
-
-  .loan-item {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 14px 18px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 8px;
-  }
+  .loan-item { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
   .loan-item .loan-info h4 { font-size: 14px; font-weight: 600; }
   .loan-item .loan-info p { font-size: 12px; color: var(--muted); font-family: var(--font-mono); margin-top: 2px; }
   .loan-item .loan-amount { font-size: 16px; font-weight: 700; color: var(--danger); font-family: var(--font-mono); }
   .loan-delete { background: rgba(232,79,61,0.15); border: 1px solid rgba(232,79,61,0.3); color: var(--danger); border-radius: 6px; padding: 5px 10px; cursor: pointer; font-size: 12px; transition: background 0.2s; }
   .loan-delete:hover { background: rgba(232,79,61,0.3); }
 
-  /* Admin PIN gate */
-  #admin-pin-gate {
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 24px;
-  }
-  #admin-pin-gate .gate-box {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 24px;
-    padding: 40px 32px;
-    max-width: 360px;
-    width: 100%;
-    text-align: center;
-  }
+  #admin-pin-gate { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+  #admin-pin-gate .gate-box { background: var(--surface); border: 1px solid var(--border); border-radius: 24px; padding: 40px 32px; max-width: 360px; width: 100%; text-align: center; }
   #admin-pin-gate .gate-icon { font-size: 48px; margin-bottom: 16px; }
   #admin-pin-gate h2 { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
   #admin-pin-gate p { font-size: 13px; color: var(--muted); margin-bottom: 24px; font-family: var(--font-mono); }
 
-  /* Responsive */
-  @media (max-width: 600px) {
-    .admin-body { padding: 16px; }
-    .stats-row { grid-template-columns: 1fr 1fr; }
-    .tabs { flex-wrap: wrap; }
-  }
+  @media (max-width: 600px) { .admin-body { padding: 16px; } .stats-row { grid-template-columns: 1fr 1fr; } .tabs { flex-wrap: wrap; } }
 
-  /* Empty state */
-  .empty-state {
-    text-align: center;
-    padding: 48px 24px;
-    color: var(--muted);
-  }
+  .empty-state { text-align: center; padding: 48px 24px; color: var(--muted); }
   .empty-state .empty-icon { font-size: 40px; margin-bottom: 12px; }
   .empty-state p { font-size: 15px; }
 
-  /* Toast notification */
-  .toast {
-    position: fixed;
-    bottom: 24px;
-    left: 50%;
-    transform: translateX(-50%) translateY(80px);
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 14px 24px;
-    font-size: 14px;
-    font-weight: 600;
-    z-index: 9999;
-    transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
-    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
-    white-space: nowrap;
-  }
+  .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px); background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; padding: 14px 24px; font-size: 14px; font-weight: 600; z-index: 9999; transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1); box-shadow: 0 8px 32px rgba(0,0,0,0.5); white-space: nowrap; }
   .toast.show { transform: translateX(-50%) translateY(0); }
   .toast.success { border-color: var(--accent); color: var(--accent); }
   .toast.error { border-color: var(--danger); color: var(--danger); }
@@ -735,14 +288,15 @@
 </head>
 <body>
 
-<!-- ══════════════════════════════════════════
-     TOAST
-══════════════════════════════════════════ -->
+<!-- Loading overlay -->
+<div id="loading-overlay">
+  <div class="loading-logo">WorkTrack</div>
+  <div class="loading-spinner"></div>
+</div>
+
 <div class="toast" id="toast"></div>
 
-<!-- ══════════════════════════════════════════
-     SCREEN 1: CLOCK-IN
-══════════════════════════════════════════ -->
+<!-- SCREEN 1: CLOCK-IN -->
 <div id="clockin-screen" class="screen active">
   <div class="ci-header">
     <div class="logo">WorkTrack</div>
@@ -750,9 +304,7 @@
     <div class="live-time" id="live-time"></div>
     <span class="admin-link" onclick="openAdminGate()">⚙ admin</span>
   </div>
-
   <div class="ci-body">
-    <!-- Clocked-in status card (shown when someone is active) -->
     <div id="active-status" style="display:none">
       <div class="status-card">
         <div class="status-badge">CLOCKED IN</div>
@@ -762,15 +314,12 @@
       <button class="btn btn-danger" onclick="openClockOutModal()">⏹ Clock Out</button>
       <div style="height:24px"></div>
     </div>
-
     <div class="section-label">Select Your Name</div>
     <div class="employee-grid" id="employee-grid"></div>
   </div>
 </div>
 
-<!-- ══════════════════════════════════════════
-     MODAL: PIN ENTRY
-══════════════════════════════════════════ -->
+<!-- MODAL: PIN ENTRY -->
 <div class="modal-overlay" id="pin-modal">
   <div class="modal-sheet">
     <div class="modal-handle"></div>
@@ -778,10 +327,8 @@
     <div class="modal-subtitle" id="pin-modal-subtitle">4-digit PIN</div>
     <div class="error-msg" id="pin-error">Incorrect PIN. Try again.</div>
     <div class="pin-dots" id="pin-dots">
-      <div class="pin-dot" id="d0"></div>
-      <div class="pin-dot" id="d1"></div>
-      <div class="pin-dot" id="d2"></div>
-      <div class="pin-dot" id="d3"></div>
+      <div class="pin-dot" id="d0"></div><div class="pin-dot" id="d1"></div>
+      <div class="pin-dot" id="d2"></div><div class="pin-dot" id="d3"></div>
     </div>
     <div class="numpad">
       <button class="numpad-btn" onclick="pinKey('1')">1</button>
@@ -801,36 +348,26 @@
   </div>
 </div>
 
-<!-- ══════════════════════════════════════════
-     MODAL: CLOCK-IN DETAILS
-══════════════════════════════════════════ -->
+<!-- MODAL: CLOCK-IN DETAILS -->
 <div class="modal-overlay" id="clockin-modal">
   <div class="modal-sheet">
     <div class="modal-handle"></div>
     <div class="modal-title" id="clockin-modal-title">Clock In</div>
     <div class="modal-subtitle" id="clockin-modal-sub">Select options below</div>
-
     <label class="field-label">Day Type</label>
     <div class="day-toggle">
       <div class="day-btn selected" id="btn-full" onclick="selectDayType('full')">☀ Full Day</div>
       <div class="day-btn" id="btn-half" onclick="selectDayType('half')">◐ Half Day</div>
     </div>
-
     <label class="field-label">Job Site</label>
-    <select id="site-select">
-      <option value="">-- Select Site --</option>
-    </select>
-
+    <select id="site-select"><option value="">-- Select Site --</option></select>
     <div class="error-msg" id="clockin-error">Please select a job site.</div>
-
     <button class="btn btn-primary" onclick="doClockIn()">▶ Clock In</button>
     <button class="btn btn-secondary" style="margin-top:10px" onclick="closeModal('clockin-modal')">Cancel</button>
   </div>
 </div>
 
-<!-- ══════════════════════════════════════════
-     MODAL: CLOCK-OUT CONFIRM
-══════════════════════════════════════════ -->
+<!-- MODAL: CLOCK-OUT CONFIRM -->
 <div class="modal-overlay" id="clockout-modal">
   <div class="modal-sheet">
     <div class="modal-handle"></div>
@@ -842,9 +379,7 @@
   </div>
 </div>
 
-<!-- ══════════════════════════════════════════
-     SCREEN 2: ADMIN PIN GATE
-══════════════════════════════════════════ -->
+<!-- SCREEN 2: ADMIN PIN GATE -->
 <div id="admin-gate-screen" class="screen">
   <div id="admin-pin-gate">
     <div class="gate-box">
@@ -853,10 +388,8 @@
       <p>Enter the admin PIN to continue</p>
       <div class="error-msg" id="admin-pin-error">Incorrect PIN.</div>
       <div class="pin-dots">
-        <div class="pin-dot" id="ad0"></div>
-        <div class="pin-dot" id="ad1"></div>
-        <div class="pin-dot" id="ad2"></div>
-        <div class="pin-dot" id="ad3"></div>
+        <div class="pin-dot" id="ad0"></div><div class="pin-dot" id="ad1"></div>
+        <div class="pin-dot" id="ad2"></div><div class="pin-dot" id="ad3"></div>
       </div>
       <div class="numpad">
         <button class="numpad-btn" onclick="adminPinKey('1')">1</button>
@@ -877,35 +410,27 @@
   </div>
 </div>
 
-<!-- ══════════════════════════════════════════
-     SCREEN 3: ADMIN DASHBOARD
-══════════════════════════════════════════ -->
+<!-- SCREEN 3: ADMIN DASHBOARD -->
 <div id="admin-screen" class="screen">
   <div class="admin-nav">
     <div class="nav-logo">WorkTrack</div>
     <div class="nav-title">Admin Dashboard</div>
     <button class="nav-btn" onclick="adminLogout()">← Exit</button>
   </div>
-
   <div class="admin-body">
-    <!-- Tabs -->
     <div class="tabs">
-      <button class="tab active" onclick="switchTab('tab-records')">📋 Records</button>
-      <button class="tab" onclick="switchTab('tab-payroll')">💰 Payroll</button>
-      <button class="tab" onclick="switchTab('tab-loans')">📉 Loans</button>
-      <button class="tab" onclick="switchTab('tab-employees')">👥 Employees</button>
+      <button class="tab active" onclick="switchTab('tab-records', this)">📋 Records</button>
+      <button class="tab" onclick="switchTab('tab-payroll', this)">💰 Payroll</button>
+      <button class="tab" onclick="switchTab('tab-loans', this)">📉 Loans</button>
+      <button class="tab" onclick="switchTab('tab-employees', this)">👥 Employees</button>
     </div>
 
-    <!-- ── TAB: Records ── -->
     <div class="tab-pane active" id="tab-records">
       <div class="stats-row" id="stats-row"></div>
-
       <div class="filter-row">
         <div>
           <label class="field-label">Filter Employee</label>
-          <select id="filter-emp" onchange="renderRecords()">
-            <option value="">All Employees</option>
-          </select>
+          <select id="filter-emp" onchange="renderRecords()"><option value="">All Employees</option></select>
         </div>
         <div>
           <label class="field-label">Filter Date</label>
@@ -913,86 +438,63 @@
         </div>
         <button class="btn btn-secondary" style="max-width:100px;margin-bottom:16px;padding:14px 10px;font-size:13px" onclick="clearFilters()">Clear</button>
       </div>
-
       <div class="table-wrap">
         <table>
-          <thead>
-            <tr>
-              <th>Employee</th>
-              <th>Date</th>
-              <th>Clock In</th>
-              <th>Clock Out</th>
-              <th>Site</th>
-              <th>Type</th>
-              <th>Gross Pay</th>
-            </tr>
-          </thead>
+          <thead><tr><th>Employee</th><th>Date</th><th>Clock In</th><th>Clock Out</th><th>Site</th><th>Type</th><th>Gross Pay</th></tr></thead>
           <tbody id="records-tbody"></tbody>
         </table>
       </div>
     </div>
 
-    <!-- ── TAB: Payroll ── -->
     <div class="tab-pane" id="tab-payroll">
       <div class="filter-row">
-        <div>
-          <label class="field-label">Period From</label>
-          <input type="date" id="pay-from" onchange="renderPayroll()" />
-        </div>
-        <div>
-          <label class="field-label">Period To</label>
-          <input type="date" id="pay-to" onchange="renderPayroll()" />
-        </div>
+        <div><label class="field-label">Period From</label><input type="date" id="pay-from" onchange="renderPayroll()" /></div>
+        <div><label class="field-label">Period To</label><input type="date" id="pay-to" onchange="renderPayroll()" /></div>
         <button class="btn btn-primary" style="max-width:120px;margin-bottom:16px;padding:14px 10px;font-size:13px" onclick="setPayPeriodThisWeek()">This Week</button>
       </div>
       <div class="payroll-row" id="payroll-cards"></div>
     </div>
 
-    <!-- ── TAB: Loans ── -->
     <div class="tab-pane" id="tab-loans">
       <div class="loan-form">
         <h3>➕ Add Loan / Advance</h3>
         <div class="form-grid">
-          <div>
-            <label class="field-label">Employee</label>
-            <select id="loan-emp"></select>
-          </div>
-          <div>
-            <label class="field-label">Amount (R)</label>
-            <input type="number" id="loan-amount" placeholder="500.00" min="1" />
-          </div>
+          <div><label class="field-label">Employee</label><select id="loan-emp"></select></div>
+          <div><label class="field-label">Amount (R)</label><input type="number" id="loan-amount" placeholder="500.00" min="1" /></div>
         </div>
         <label class="field-label">Reason</label>
         <input type="text" id="loan-reason" placeholder="e.g. Advance on salary" />
         <button class="btn btn-primary" onclick="addLoan()">Add Loan</button>
       </div>
-
       <div class="section-label">Active Loans</div>
       <div class="loan-list" id="loan-list"></div>
     </div>
 
-    <!-- ── TAB: Employees ── -->
     <div class="tab-pane" id="tab-employees">
       <div class="emp-mgmt-grid" id="emp-mgmt-grid"></div>
     </div>
   </div>
 </div>
 
-<!-- ══════════════════════════════════════════
-     JAVASCRIPT
-══════════════════════════════════════════ -->
 <script>
 // ─────────────────────────────────────────
 // DEFAULT DATA
 // ─────────────────────────────────────────
-
 const DEFAULT_EMPLOYEES = [
-  { name: 'Thabo Nkosi',     pin: '1234', rate: 350 },
-  { name: 'Lerato Dlamini',  pin: '2345', rate: 350 },
-  { name: 'Sipho Mkhize',    pin: '3456', rate: 380 },
-  { name: 'Zanele Mokoena',  pin: '4567', rate: 350 },
-  { name: 'Mandla Sithole',  pin: '5678', rate: 400 },
-  { name: 'Ayanda Bhengu',   pin: '6789', rate: 350 },
+  { name: 'Willem',   pin: '1111', rate: 350 },
+  { name: 'Adam',     pin: '2222', rate: 350 },
+  { name: 'Marius',   pin: '3333', rate: 350 },
+  { name: 'Spiker',   pin: '4444', rate: 350 },
+  { name: 'Ethan',    pin: '5555', rate: 350 },
+  { name: 'Dino',     pin: '6666', rate: 350 },
+  { name: 'Typie',    pin: '7777', rate: 350 },
+  { name: 'Andre',    pin: '8888', rate: 350 },
+  { name: 'Janneman', pin: '9999', rate: 350 },
+  { name: 'Pastor',   pin: '1010', rate: 350 },
+  { name: 'Bennie',   pin: '1100', rate: 350 },
+  { name: '1gig',     pin: '1212', rate: 350 },
+  { name: 'Hendry',   pin: '1313', rate: 350 },
+  { name: 'Darren',   pin: '1414', rate: 350 },
 ];
 
 const DEFAULT_SITES = [
@@ -1004,37 +506,71 @@ const DEFAULT_SITES = [
   'Warehouse',
 ];
 
-const ADMIN_PIN = '0000'; // Change this to your preferred admin PIN
+const ADMIN_PIN = '0000';
 
 // ─────────────────────────────────────────
-// STATE (localStorage)
+// STATE  (loaded from persistent storage)
 // ─────────────────────────────────────────
+let employees     = [];
+let records       = [];
+let loans         = [];
+let activeSession = null;
 
-function loadData(key, fallback) {
+// ─────────────────────────────────────────
+// PERSISTENT STORAGE HELPERS
+// ─────────────────────────────────────────
+async function storageGet(key) {
   try {
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : fallback;
-  } catch { return fallback; }
+    const result = await window.storage.get(key);
+    return result ? JSON.parse(result.value) : null;
+  } catch { return null; }
 }
 
-function saveData(key, value) {
-  localStorage.setItem(key, JSON.stringify(value));
+async function storageSet(key, value) {
+  try {
+    await window.storage.set(key, JSON.stringify(value));
+  } catch (e) { console.error('Storage set error:', e); }
 }
 
-// First-time initialization
-if (!localStorage.getItem('wt_employees')) {
-  saveData('wt_employees', DEFAULT_EMPLOYEES);
-}
+// ─────────────────────────────────────────
+// INIT — load all data then boot
+// ─────────────────────────────────────────
+const EMPLOYEE_VERSION = 'v2';
 
-let employees  = loadData('wt_employees', DEFAULT_EMPLOYEES);
-let records    = loadData('wt_records',   []);
-let loans      = loadData('wt_loans',     []);
-let activeSession = loadData('wt_active', null); // current clocked-in user
+async function init() {
+  const [savedEmps, savedRecs, savedLoans, savedActive, savedEmpVer] = await Promise.all([
+    storageGet('wt_employees'),
+    storageGet('wt_records'),
+    storageGet('wt_loans'),
+    storageGet('wt_active'),
+    storageGet('wt_emp_version'),
+  ]);
+
+  // If employee list version changed, reset to new defaults
+  if (savedEmpVer !== EMPLOYEE_VERSION) {
+    employees = DEFAULT_EMPLOYEES;
+    await storageSet('wt_employees', employees);
+    await storageSet('wt_emp_version', EMPLOYEE_VERSION);
+  } else {
+    employees = savedEmps || DEFAULT_EMPLOYEES;
+  }
+
+  records       = savedRecs   || [];
+  loans         = savedLoans  || [];
+  activeSession = savedActive || null;
+
+  renderEmployeeGrid();
+  document.getElementById('filter-date').value = new Date().toISOString().split('T')[0];
+
+  // Hide loader
+  const overlay = document.getElementById('loading-overlay');
+  overlay.classList.add('hidden');
+  setTimeout(() => overlay.remove(), 500);
+}
 
 // ─────────────────────────────────────────
 // SCREEN SWITCHING
 // ─────────────────────────────────────────
-
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
@@ -1043,23 +579,19 @@ function showScreen(id) {
 // ─────────────────────────────────────────
 // LIVE CLOCK
 // ─────────────────────────────────────────
-
 function updateClock() {
   const el = document.getElementById('live-time');
-  if (el) {
-    el.textContent = new Date().toLocaleString('en-ZA', {
-      weekday: 'short', day: '2-digit', month: 'short',
-      hour: '2-digit', minute: '2-digit', second: '2-digit'
-    });
-  }
+  if (el) el.textContent = new Date().toLocaleString('en-ZA', {
+    weekday: 'short', day: '2-digit', month: 'short',
+    hour: '2-digit', minute: '2-digit', second: '2-digit'
+  });
 }
 setInterval(updateClock, 1000);
 updateClock();
 
 // ─────────────────────────────────────────
-// EMPLOYEE GRID (clock-in screen)
+// EMPLOYEE GRID
 // ─────────────────────────────────────────
-
 function renderEmployeeGrid() {
   const grid = document.getElementById('employee-grid');
   grid.innerHTML = employees.map((emp, i) => {
@@ -1073,7 +605,6 @@ function renderEmployeeGrid() {
       </div>`;
   }).join('');
 
-  // Active session banner
   const banner = document.getElementById('active-status');
   if (activeSession) {
     banner.style.display = 'block';
@@ -1088,23 +619,16 @@ function renderEmployeeGrid() {
 // ─────────────────────────────────────────
 // PIN MODAL (employee login)
 // ─────────────────────────────────────────
-
 let pinBuffer = '';
-let pinTarget = null; // index of employee being authenticated
+let pinTarget = null;
 
 function selectEmployee(i) {
   const emp = employees[i];
-  // If this employee is already clocked in, redirect to clock-out
-  if (activeSession && activeSession.empName === emp.name) {
-    openClockOutModal();
-    return;
-  }
-  // If someone else is clocked in, prevent another clock-in
+  if (activeSession && activeSession.empName === emp.name) { openClockOutModal(); return; }
   if (activeSession && activeSession.empName !== emp.name) {
     showToast(`${activeSession.empName} is currently clocked in. Please clock out first.`, 'error');
     return;
   }
-
   pinTarget = i;
   pinBuffer = '';
   updatePinDots();
@@ -1118,43 +642,23 @@ function pinKey(digit) {
   if (pinBuffer.length >= 4) return;
   pinBuffer += digit;
   updatePinDots();
-  if (pinBuffer.length === 4) {
-    setTimeout(validatePin, 200);
-  }
+  if (pinBuffer.length === 4) setTimeout(validatePin, 200);
 }
-
-function pinDel() {
-  pinBuffer = pinBuffer.slice(0, -1);
-  updatePinDots();
-}
-
-function pinClear() {
-  pinBuffer = '';
-  updatePinDots();
-}
-
+function pinDel()   { pinBuffer = pinBuffer.slice(0, -1); updatePinDots(); }
+function pinClear() { pinBuffer = ''; updatePinDots(); }
 function updatePinDots() {
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 4; i++)
     document.getElementById('d' + i).classList.toggle('filled', i < pinBuffer.length);
-  }
 }
-
 function validatePin() {
   const emp = employees[pinTarget];
-  if (pinBuffer === emp.pin) {
-    closeModal('pin-modal');
-    openClockInModal(pinTarget);
-  } else {
-    document.getElementById('pin-error').classList.add('show');
-    pinBuffer = '';
-    updatePinDots();
-  }
+  if (pinBuffer === emp.pin) { closeModal('pin-modal'); openClockInModal(pinTarget); }
+  else { document.getElementById('pin-error').classList.add('show'); pinBuffer = ''; updatePinDots(); }
 }
 
 // ─────────────────────────────────────────
 // CLOCK-IN MODAL
 // ─────────────────────────────────────────
-
 let clockInEmployeeIndex = null;
 let selectedDayType = 'full';
 
@@ -1168,12 +672,9 @@ function openClockInModal(i) {
     weekday: 'long', day: '2-digit', month: 'long', year: 'numeric'
   });
   document.getElementById('clockin-error').classList.remove('show');
-
-  // Populate sites
   const sel = document.getElementById('site-select');
   sel.innerHTML = '<option value="">-- Select Site --</option>' +
     DEFAULT_SITES.map(s => `<option value="${s}">${s}</option>`).join('');
-
   openModal('clockin-modal');
 }
 
@@ -1183,28 +684,25 @@ function selectDayType(type) {
   document.getElementById('btn-half').classList.toggle('selected', type === 'half');
 }
 
-function doClockIn() {
+async function doClockIn() {
   const site = document.getElementById('site-select').value;
-  if (!site) {
-    document.getElementById('clockin-error').classList.add('show');
-    return;
-  }
+  if (!site) { document.getElementById('clockin-error').classList.add('show'); return; }
   document.getElementById('clockin-error').classList.remove('show');
 
   const now = new Date();
   const emp = employees[clockInEmployeeIndex];
 
   activeSession = {
-    empName:  emp.name,
-    empIndex: clockInEmployeeIndex,
-    date:     now.toISOString().split('T')[0],
-    clockIn:  now.toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' }),
+    empName:    emp.name,
+    empIndex:   clockInEmployeeIndex,
+    date:       now.toISOString().split('T')[0],
+    clockIn:    now.toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' }),
     clockInISO: now.toISOString(),
-    dayType:  selectedDayType,
-    site:     site,
+    dayType:    selectedDayType,
+    site:       site,
   };
 
-  saveData('wt_active', activeSession);
+  await storageSet('wt_active', activeSession);
   closeModal('clockin-modal');
   renderEmployeeGrid();
   showToast(`${emp.name} clocked in ✔`, 'success');
@@ -1213,7 +711,6 @@ function doClockIn() {
 // ─────────────────────────────────────────
 // CLOCK-OUT
 // ─────────────────────────────────────────
-
 function openClockOutModal() {
   if (!activeSession) return;
   document.getElementById('clockout-detail').textContent =
@@ -1221,35 +718,31 @@ function openClockOutModal() {
   openModal('clockout-modal');
 }
 
-function doClockOut() {
+async function doClockOut() {
   if (!activeSession) return;
-
   const now = new Date();
-  const clockOut = now.toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' });
-
-  // Find employee rate
   const emp = employees.find(e => e.name === activeSession.empName);
   const rate = emp ? emp.rate : 350;
   const dailyPay = activeSession.dayType === 'full' ? rate : rate * 0.5;
 
   const record = {
-    id:        Date.now(),
-    empName:   activeSession.empName,
-    date:      activeSession.date,
-    clockIn:   activeSession.clockIn,
-    clockInISO: activeSession.clockInISO,
-    clockOut:  clockOut,
+    id:          Date.now(),
+    empName:     activeSession.empName,
+    date:        activeSession.date,
+    clockIn:     activeSession.clockIn,
+    clockInISO:  activeSession.clockInISO,
+    clockOut:    now.toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' }),
     clockOutISO: now.toISOString(),
-    site:      activeSession.site,
-    dayType:   activeSession.dayType,
-    dailyPay:  dailyPay,
+    site:        activeSession.site,
+    dayType:     activeSession.dayType,
+    dailyPay:    dailyPay,
   };
 
   records.push(record);
-  saveData('wt_records', records);
+  await storageSet('wt_records', records);
 
   activeSession = null;
-  saveData('wt_active', null);
+  await storageSet('wt_active', null);
 
   closeModal('clockout-modal');
   renderEmployeeGrid();
@@ -1259,27 +752,16 @@ function doClockOut() {
 // ─────────────────────────────────────────
 // MODAL HELPERS
 // ─────────────────────────────────────────
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 
-function openModal(id) {
-  document.getElementById(id).classList.add('open');
-}
-
-function closeModal(id) {
-  document.getElementById(id).classList.remove('open');
-  // Close on overlay click
-}
-
-// Close modal if user taps outside the sheet
 document.querySelectorAll('.modal-overlay').forEach(overlay => {
-  overlay.addEventListener('click', function(e) {
-    if (e.target === this) this.classList.remove('open');
-  });
+  overlay.addEventListener('click', function(e) { if (e.target === this) this.classList.remove('open'); });
 });
 
 // ─────────────────────────────────────────
 // ADMIN GATE
 // ─────────────────────────────────────────
-
 let adminPinBuffer = '';
 
 function openAdminGate() {
@@ -1293,61 +775,42 @@ function adminPinKey(digit) {
   if (adminPinBuffer.length >= 4) return;
   adminPinBuffer += digit;
   updateAdminPinDots();
-  if (adminPinBuffer.length === 4) {
-    setTimeout(validateAdminPin, 200);
-  }
+  if (adminPinBuffer.length === 4) setTimeout(validateAdminPin, 200);
 }
-
-function adminPinDel() {
-  adminPinBuffer = adminPinBuffer.slice(0, -1);
-  updateAdminPinDots();
-}
-
-function adminPinClear() {
-  adminPinBuffer = '';
-  updateAdminPinDots();
-}
-
+function adminPinDel()   { adminPinBuffer = adminPinBuffer.slice(0, -1); updateAdminPinDots(); }
+function adminPinClear() { adminPinBuffer = ''; updateAdminPinDots(); }
 function updateAdminPinDots() {
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 4; i++)
     document.getElementById('ad' + i).classList.toggle('filled', i < adminPinBuffer.length);
-  }
 }
-
 function validateAdminPin() {
-  if (adminPinBuffer === ADMIN_PIN) {
-    showScreen('admin-screen');
-    refreshAdminUI();
-  } else {
-    document.getElementById('admin-pin-error').classList.add('show');
-    adminPinBuffer = '';
-    updateAdminPinDots();
-  }
+  if (adminPinBuffer === ADMIN_PIN) { showScreen('admin-screen'); refreshAdminUI(); }
+  else { document.getElementById('admin-pin-error').classList.add('show'); adminPinBuffer = ''; updateAdminPinDots(); }
 }
-
-function adminLogout() {
-  showScreen('clockin-screen');
-}
+function adminLogout() { showScreen('clockin-screen'); }
 
 // ─────────────────────────────────────────
 // ADMIN TABS
 // ─────────────────────────────────────────
-
-function switchTab(id) {
+function switchTab(id, btn) {
   document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.getElementById(id).classList.add('active');
-  event.target.classList.add('active');
+  btn.classList.add('active');
 }
 
 // ─────────────────────────────────────────
 // REFRESH ALL ADMIN UI
 // ─────────────────────────────────────────
-
-function refreshAdminUI() {
-  employees = loadData('wt_employees', DEFAULT_EMPLOYEES);
-  records   = loadData('wt_records',   []);
-  loans     = loadData('wt_loans',     []);
+async function refreshAdminUI() {
+  const [savedEmps, savedRecs, savedLoans] = await Promise.all([
+    storageGet('wt_employees'),
+    storageGet('wt_records'),
+    storageGet('wt_loans'),
+  ]);
+  employees = savedEmps  || DEFAULT_EMPLOYEES;
+  records   = savedRecs  || [];
+  loans     = savedLoans || [];
 
   renderStats();
   renderRecords();
@@ -1360,56 +823,35 @@ function refreshAdminUI() {
 // ─────────────────────────────────────────
 // STATS
 // ─────────────────────────────────────────
-
 function renderStats() {
-  const totalShifts   = records.length;
-  const totalGross    = records.reduce((s, r) => s + r.dailyPay, 0);
-  const totalLoans    = loans.reduce((s, l) => s + l.amount, 0);
-  const net           = totalGross - totalLoans;
-
+  const totalShifts = records.length;
+  const totalGross  = records.reduce((s, r) => s + r.dailyPay, 0);
+  const totalLoans  = loans.reduce((s, l) => s + l.amount, 0);
+  const net         = totalGross - totalLoans;
   document.getElementById('stats-row').innerHTML = `
-    <div class="stat-card">
-      <div class="stat-label">Total Shifts</div>
-      <div class="stat-value blue">${totalShifts}</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Gross Pay</div>
-      <div class="stat-value green">R ${totalGross.toFixed(2)}</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Loans</div>
-      <div class="stat-value orange">R ${totalLoans.toFixed(2)}</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Net Pay</div>
-      <div class="stat-value ${net >= 0 ? 'green' : 'orange'}">R ${net.toFixed(2)}</div>
-    </div>`;
+    <div class="stat-card"><div class="stat-label">Total Shifts</div><div class="stat-value blue">${totalShifts}</div></div>
+    <div class="stat-card"><div class="stat-label">Gross Pay</div><div class="stat-value green">R ${totalGross.toFixed(2)}</div></div>
+    <div class="stat-card"><div class="stat-label">Loans</div><div class="stat-value orange">R ${totalLoans.toFixed(2)}</div></div>
+    <div class="stat-card"><div class="stat-label">Net Pay</div><div class="stat-value ${net >= 0 ? 'green' : 'orange'}">R ${net.toFixed(2)}</div></div>`;
 }
 
 // ─────────────────────────────────────────
 // RECORDS TABLE
 // ─────────────────────────────────────────
-
 function renderRecords() {
-  const empFilter  = document.getElementById('filter-emp')?.value || '';
+  const empFilter  = document.getElementById('filter-emp')?.value  || '';
   const dateFilter = document.getElementById('filter-date')?.value || '';
-
   let filtered = records.filter(r => {
-    if (empFilter  && r.empName !== empFilter)   return false;
-    if (dateFilter && r.date    !== dateFilter)   return false;
+    if (empFilter  && r.empName !== empFilter) return false;
+    if (dateFilter && r.date    !== dateFilter) return false;
     return true;
   });
-
-  // Sort newest first
   filtered.sort((a, b) => new Date(b.clockInISO) - new Date(a.clockInISO));
-
   const tbody = document.getElementById('records-tbody');
-
   if (!filtered.length) {
     tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">📭</div><p>No records found.</p></div></td></tr>`;
     return;
   }
-
   tbody.innerHTML = filtered.map(r => `
     <tr>
       <td><strong>${r.empName}</strong></td>
@@ -1429,17 +871,15 @@ function clearFilters() {
 }
 
 // ─────────────────────────────────────────
-// PAYROLL SUMMARY
+// PAYROLL
 // ─────────────────────────────────────────
-
 function setPayPeriodThisWeek() {
-  const now   = new Date();
-  const day   = now.getDay(); // 0=Sun
-  const mon   = new Date(now);
+  const now = new Date();
+  const day = now.getDay();
+  const mon = new Date(now);
   mon.setDate(now.getDate() - (day === 0 ? 6 : day - 1));
-  const sun   = new Date(mon);
+  const sun = new Date(mon);
   sun.setDate(mon.getDate() + 6);
-
   document.getElementById('pay-from').value = mon.toISOString().split('T')[0];
   document.getElementById('pay-to').value   = sun.toISOString().split('T')[0];
   renderPayroll();
@@ -1448,54 +888,27 @@ function setPayPeriodThisWeek() {
 function renderPayroll() {
   const from = document.getElementById('pay-from')?.value;
   const to   = document.getElementById('pay-to')?.value;
-
   let filtered = records;
   if (from) filtered = filtered.filter(r => r.date >= from);
   if (to)   filtered = filtered.filter(r => r.date <= to);
 
-  const container = document.getElementById('payroll-cards');
-
-  if (!employees.length) {
-    container.innerHTML = '<p style="color:var(--muted)">No employees configured.</p>';
-    return;
-  }
-
-  container.innerHTML = employees.map(emp => {
+  document.getElementById('payroll-cards').innerHTML = employees.map(emp => {
     const empRecords = filtered.filter(r => r.empName === emp.name);
-    const gross   = empRecords.reduce((s, r) => s + r.dailyPay, 0);
-    const empLoans = loans.filter(l => l.empName === emp.name);
-    const loanTotal = empLoans.reduce((s, l) => s + l.amount, 0);
-    const net = gross - loanTotal;
-    const initial = emp.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
-
+    const gross      = empRecords.reduce((s, r) => s + r.dailyPay, 0);
+    const loanTotal  = loans.filter(l => l.empName === emp.name).reduce((s, l) => s + l.amount, 0);
+    const net        = gross - loanTotal;
+    const initial    = emp.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
     return `
       <div class="payroll-card">
-        <h3>
-          <span style="display:inline-flex;align-items:center;gap:10px">
-            <span style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--accent2),var(--accent));display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:var(--bg)">${initial}</span>
-            ${emp.name}
-          </span>
-        </h3>
-        <div class="pay-line">
-          <span class="pay-key">Days Worked</span>
-          <span class="pay-val">${empRecords.length}</span>
-        </div>
-        <div class="pay-line">
-          <span class="pay-key">Daily Rate</span>
-          <span class="pay-val">R ${emp.rate.toFixed(2)}</span>
-        </div>
-        <div class="pay-line">
-          <span class="pay-key">Gross Pay</span>
-          <span class="pay-val" style="color:var(--accent2)">R ${gross.toFixed(2)}</span>
-        </div>
-        <div class="pay-line">
-          <span class="pay-key">Loan Deductions</span>
-          <span class="pay-val" style="color:var(--danger)">– R ${loanTotal.toFixed(2)}</span>
-        </div>
-        <div class="pay-line total">
-          <span class="pay-key">Net Pay</span>
-          <span class="pay-val">R ${net.toFixed(2)}</span>
-        </div>
+        <h3><span style="display:inline-flex;align-items:center;gap:10px">
+          <span style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--accent2),var(--accent));display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:var(--bg)">${initial}</span>
+          ${emp.name}
+        </span></h3>
+        <div class="pay-line"><span class="pay-key">Days Worked</span><span class="pay-val">${empRecords.length}</span></div>
+        <div class="pay-line"><span class="pay-key">Daily Rate</span><span class="pay-val">R ${emp.rate.toFixed(2)}</span></div>
+        <div class="pay-line"><span class="pay-key">Gross Pay</span><span class="pay-val" style="color:var(--accent2)">R ${gross.toFixed(2)}</span></div>
+        <div class="pay-line"><span class="pay-key">Loan Deductions</span><span class="pay-val" style="color:var(--danger)">– R ${loanTotal.toFixed(2)}</span></div>
+        <div class="pay-line total"><span class="pay-key">Net Pay</span><span class="pay-val">R ${net.toFixed(2)}</span></div>
       </div>`;
   }).join('');
 }
@@ -1503,57 +916,32 @@ function renderPayroll() {
 // ─────────────────────────────────────────
 // LOANS
 // ─────────────────────────────────────────
-
-function addLoan() {
+async function addLoan() {
   const empName = document.getElementById('loan-emp').value;
   const amount  = parseFloat(document.getElementById('loan-amount').value);
   const reason  = document.getElementById('loan-reason').value.trim();
-
-  if (!empName || isNaN(amount) || amount <= 0) {
-    showToast('Please fill in employee and a valid amount.', 'error');
-    return;
-  }
-
-  loans.push({
-    id:      Date.now(),
-    empName: empName,
-    amount:  amount,
-    reason:  reason || 'No reason given',
-    date:    new Date().toISOString().split('T')[0],
-  });
-
-  saveData('wt_loans', loans);
+  if (!empName || isNaN(amount) || amount <= 0) { showToast('Please fill in employee and a valid amount.', 'error'); return; }
+  loans.push({ id: Date.now(), empName, amount, reason: reason || 'No reason given', date: new Date().toISOString().split('T')[0] });
+  await storageSet('wt_loans', loans);
   document.getElementById('loan-amount').value = '';
   document.getElementById('loan-reason').value = '';
-  renderLoans();
-  renderPayroll();
-  renderStats();
+  renderLoans(); renderPayroll(); renderStats();
   showToast(`Loan of R${amount.toFixed(2)} added for ${empName}`, 'success');
 }
 
-function deleteLoan(id) {
+async function deleteLoan(id) {
   loans = loans.filter(l => l.id !== id);
-  saveData('wt_loans', loans);
-  renderLoans();
-  renderPayroll();
-  renderStats();
+  await storageSet('wt_loans', loans);
+  renderLoans(); renderPayroll(); renderStats();
   showToast('Loan removed.', 'success');
 }
 
 function renderLoans() {
   const container = document.getElementById('loan-list');
-
-  if (!loans.length) {
-    container.innerHTML = '<div class="empty-state"><div class="empty-icon">✅</div><p>No active loans.</p></div>';
-    return;
-  }
-
+  if (!loans.length) { container.innerHTML = '<div class="empty-state"><div class="empty-icon">✅</div><p>No active loans.</p></div>'; return; }
   container.innerHTML = loans.map(l => `
     <div class="loan-item">
-      <div class="loan-info">
-        <h4>${l.empName}</h4>
-        <p>${l.reason} · ${l.date}</p>
-      </div>
+      <div class="loan-info"><h4>${l.empName}</h4><p>${l.reason} · ${l.date}</p></div>
       <div style="display:flex;align-items:center;gap:12px">
         <div class="loan-amount">– R ${l.amount.toFixed(2)}</div>
         <button class="loan-delete" onclick="deleteLoan(${l.id})">Remove</button>
@@ -1564,28 +952,20 @@ function renderLoans() {
 // ─────────────────────────────────────────
 // EMPLOYEE MANAGEMENT
 // ─────────────────────────────────────────
-
 function renderEmployeeMgmt() {
-  const grid = document.getElementById('emp-mgmt-grid');
-
-  grid.innerHTML = employees.map((emp, i) => {
+  document.getElementById('emp-mgmt-grid').innerHTML = employees.map((emp, i) => {
     const initial = emp.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
     return `
       <div class="emp-mgmt-card">
         <div class="emp-header">
           <div class="emp-ava">${initial}</div>
-          <div class="emp-info">
-            <h3>${emp.name}</h3>
-            <p>PIN: ${'•'.repeat(emp.pin.length)}</p>
-          </div>
+          <div class="emp-info"><h3>${emp.name}</h3><p>PIN: ${'•'.repeat(emp.pin.length)}</p></div>
         </div>
-
         <label class="field-label">Daily Rate (R)</label>
         <div class="field-row">
           <input type="number" id="rate-${i}" value="${emp.rate}" min="0" step="10" />
           <button class="btn btn-primary" onclick="saveRate(${i})">Save</button>
         </div>
-
         <label class="field-label">Change PIN</label>
         <div class="field-row">
           <input type="password" id="newpin-${i}" maxlength="4" placeholder="New 4-digit PIN" />
@@ -1595,70 +975,51 @@ function renderEmployeeMgmt() {
   }).join('');
 }
 
-function saveRate(i) {
+async function saveRate(i) {
   const val = parseFloat(document.getElementById(`rate-${i}`).value);
   if (isNaN(val) || val < 0) { showToast('Invalid rate.', 'error'); return; }
   employees[i].rate = val;
-  saveData('wt_employees', employees);
+  await storageSet('wt_employees', employees);
   showToast(`Rate updated for ${employees[i].name}`, 'success');
   renderPayroll();
 }
 
-function savePin(i) {
+async function savePin(i) {
   const pin = document.getElementById(`newpin-${i}`).value.trim();
   if (!/^\d{4}$/.test(pin)) { showToast('PIN must be exactly 4 digits.', 'error'); return; }
   employees[i].pin = pin;
-  saveData('wt_employees', employees);
+  await storageSet('wt_employees', employees);
   document.getElementById(`newpin-${i}`).value = '';
   showToast(`PIN updated for ${employees[i].name}`, 'success');
 }
 
 // ─────────────────────────────────────────
-// DROPDOWN POPULATION
+// DROPDOWNS
 // ─────────────────────────────────────────
-
 function populateAdminDropdowns() {
-  // Filter employee dropdown in records
   const fe = document.getElementById('filter-emp');
-  if (fe) {
-    fe.innerHTML = '<option value="">All Employees</option>' +
-      employees.map(e => `<option value="${e.name}">${e.name}</option>`).join('');
-  }
-
-  // Loan employee dropdown
+  if (fe) fe.innerHTML = '<option value="">All Employees</option>' +
+    employees.map(e => `<option value="${e.name}">${e.name}</option>`).join('');
   const le = document.getElementById('loan-emp');
-  if (le) {
-    le.innerHTML = employees.map(e => `<option value="${e.name}">${e.name}</option>`).join('');
-  }
+  if (le) le.innerHTML = employees.map(e => `<option value="${e.name}">${e.name}</option>`).join('');
 }
 
 // ─────────────────────────────────────────
 // TOAST
 // ─────────────────────────────────────────
-
 let toastTimer = null;
-
 function showToast(msg, type = 'success') {
   const toast = document.getElementById('toast');
   toast.textContent = msg;
   toast.className = `toast ${type} show`;
   if (toastTimer) clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { toast.classList.remove('show'); }, 3000);
+  toastTimer = setTimeout(() => toast.classList.remove('show'), 3000);
 }
 
 // ─────────────────────────────────────────
-// INIT
+// BOOT
 // ─────────────────────────────────────────
-
-renderEmployeeGrid();
-
-// Set today's date as default for admin date filter
-const today = new Date().toISOString().split('T')[0];
-document.getElementById('filter-date').value = today;
-
-// Set default payroll period (current week)
-// Done via button click in UI
-
+init();
 </script>
 </body>
 </html>
