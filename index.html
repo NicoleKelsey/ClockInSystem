@@ -286,6 +286,61 @@
   .toast.show { transform: translateX(-50%) translateY(0); }
   .toast.success { border-color: var(--accent); color: var(--accent); }
   .toast.error { border-color: var(--danger); color: var(--danger); }
+
+  /* Fortnight bar */
+  .fortnight-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 20px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 14px 18px;
+    flex-wrap: wrap;
+  }
+  .fortnight-bar .fn-label { font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); font-family: var(--font-mono); white-space: nowrap; }
+  .fortnight-bar select { flex: 1; min-width: 200px; margin-bottom: 0; padding: 10px 14px; font-size: 14px; }
+  .fn-nav { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 8px; padding: 8px 14px; color: var(--text); font-size: 16px; cursor: pointer; transition: all 0.2s; white-space: nowrap; font-family: var(--font-mono); }
+  .fn-nav:hover { border-color: var(--accent); color: var(--accent); }
+  .fn-current { font-size: 13px; font-family: var(--font-mono); color: var(--accent); white-space: nowrap; font-weight: 600; }
+
+  /* Summary strip */
+  .pay-summary-strip {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .pay-summary-strip .ps-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; }
+  .pay-summary-strip .ps-label { font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); font-family: var(--font-mono); margin-bottom: 6px; }
+  .pay-summary-strip .ps-val { font-size: 22px; font-weight: 800; }
+
+  /* Enhanced payroll card */
+  .payroll-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--card-radius); padding: 20px; position: relative; overflow: hidden; }
+  .payroll-card.paid { border-color: rgba(61,232,160,0.3); background: linear-gradient(135deg, rgba(61,232,160,0.04) 0%, var(--surface) 100%); }
+  .payroll-card .paid-stamp { position: absolute; top: 14px; right: 14px; background: rgba(61,232,160,0.15); border: 1px solid rgba(61,232,160,0.3); color: var(--accent); font-size: 10px; font-weight: 700; letter-spacing: 2px; padding: 4px 10px; border-radius: 20px; font-family: var(--font-mono); }
+  .payroll-card h3 { font-size: 16px; font-weight: 700; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+  .pay-line { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; font-size: 14px; border-bottom: 1px solid var(--border); }
+  .pay-line:last-child { border-bottom: none; }
+  .pay-line .pay-key { color: var(--muted); }
+  .pay-line .pay-val { font-family: var(--font-mono); font-weight: 600; }
+  .pay-line.total .pay-key { font-weight: 700; color: var(--text); }
+  .pay-line.total .pay-val { color: var(--accent); font-size: 18px; }
+  .pay-action { margin-top: 14px; }
+  .btn-pay { width: 100%; padding: 13px; border-radius: 10px; border: none; font-size: 14px; font-weight: 700; cursor: pointer; font-family: var(--font-main); background: var(--accent); color: var(--bg); transition: all 0.2s; }
+  .btn-pay:hover { filter: brightness(1.1); }
+  .btn-pay:disabled { background: var(--surface2); color: var(--muted); cursor: not-allowed; border: 1.5px solid var(--border); }
+  .btn-unpay { width: 100%; padding: 10px; border-radius: 10px; border: 1px solid var(--border); font-size: 12px; font-weight: 600; cursor: pointer; font-family: var(--font-main); background: transparent; color: var(--muted); margin-top: 6px; transition: all 0.2s; }
+  .btn-unpay:hover { border-color: var(--danger); color: var(--danger); }
+
+  /* Day breakdown toggle */
+  .day-breakdown { margin-top: 10px; border-top: 1px solid var(--border); padding-top: 10px; display: none; }
+  .day-breakdown.open { display: block; }
+  .db-toggle { font-size: 11px; color: var(--muted); cursor: pointer; font-family: var(--font-mono); margin-top: 8px; user-select: none; }
+  .db-toggle:hover { color: var(--accent2); }
+  .db-row { display: flex; justify-content: space-between; font-size: 12px; font-family: var(--font-mono); padding: 4px 0; color: var(--muted); border-bottom: 1px solid rgba(42,48,64,0.5); }
+  .db-row:last-child { border-bottom: none; }
 </style>
 </head>
 <body>
@@ -452,12 +507,23 @@
     </div>
 
     <div class="tab-pane" id="tab-payroll">
-      <div class="filter-row">
-        <div><label class="field-label">Period From</label><input type="date" id="pay-from" onchange="renderPayroll()" /></div>
-        <div><label class="field-label">Period To</label><input type="date" id="pay-to" onchange="renderPayroll()" /></div>
-        <button class="btn btn-primary" style="max-width:120px;margin-bottom:16px;padding:14px 10px;font-size:13px" onclick="setPayPeriodThisWeek()">This Week</button>
-      </div>
+      <!-- Fortnight selector -->
+      <div class="fortnight-bar" id="fortnight-bar"></div>
+
+      <!-- Summary strip -->
+      <div class="pay-summary-strip" id="pay-summary-strip"></div>
+
+      <!-- Per-employee pay cards -->
       <div class="payroll-row" id="payroll-cards"></div>
+
+      <!-- Pay history -->
+      <div class="section-label" style="margin-top:8px">Pay Run History</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Period</th><th>Employee</th><th>Gross</th><th>Deductions</th><th>Net Paid</th><th>Date Paid</th></tr></thead>
+          <tbody id="payrun-tbody"></tbody>
+        </table>
+      </div>
     </div>
 
     <div class="tab-pane" id="tab-loans">
@@ -860,6 +926,7 @@ async function refreshAdminUI() {
   renderLoans();
   renderEmployeeMgmt();
   populateAdminDropdowns();
+  currentFnIndex = getFortnightIndex(new Date());
 }
 
 // ─────────────────────────────────────────
@@ -915,44 +982,200 @@ function clearFilters() {
 // ─────────────────────────────────────────
 // PAYROLL
 // ─────────────────────────────────────────
-function setPayPeriodThisWeek() {
-  const now = new Date();
-  const day = now.getDay();
-  const mon = new Date(now);
-  mon.setDate(now.getDate() - (day === 0 ? 6 : day - 1));
-  const sun = new Date(mon);
-  sun.setDate(mon.getDate() + 6);
-  document.getElementById('pay-from').value = mon.toISOString().split('T')[0];
-  document.getElementById('pay-to').value   = sun.toISOString().split('T')[0];
+// ─────────────────────────────────────────
+// FORTNIGHTLY PAYROLL
+// ─────────────────────────────────────────
+
+// Anchor: first fortnight started on a Monday — we use 2025-01-06 as epoch
+const FN_EPOCH = new Date('2025-01-06'); // A Monday
+
+function getFortnightIndex(date) {
+  const d = new Date(date);
+  d.setHours(0,0,0,0);
+  const diff = Math.floor((d - FN_EPOCH) / (1000 * 60 * 60 * 24));
+  return Math.floor(diff / 14);
+}
+
+function getFortnightRange(index) {
+  const start = new Date(FN_EPOCH);
+  start.setDate(FN_EPOCH.getDate() + index * 14);
+  const end = new Date(start);
+  end.setDate(start.getDate() + 13);
+  return { start, end };
+}
+
+function fmtDate(d) {
+  return d.toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function dateStr(d) {
+  return d.toISOString().split('T')[0];
+}
+
+let currentFnIndex = getFortnightIndex(new Date());
+
+function renderFortnightBar() {
+  const { start, end } = getFortnightRange(currentFnIndex);
+  const nowFn = getFortnightIndex(new Date());
+  const label = currentFnIndex === nowFn ? '📅 Current Fortnight'
+              : currentFnIndex === nowFn - 1 ? '⏮ Previous Fortnight'
+              : currentFnIndex > nowFn ? '⏭ Future'
+              : `Fortnight #${currentFnIndex + 1}`;
+
+  document.getElementById('fortnight-bar').innerHTML = `
+    <span class="fn-label">Pay Period</span>
+    <button class="fn-nav" onclick="shiftFortnight(-1)">‹ Prev</button>
+    <span class="fn-current">${fmtDate(start)} – ${fmtDate(end)}</span>
+    <button class="fn-nav" onclick="shiftFortnight(1)">Next ›</button>
+    <span style="flex:1"></span>
+    <span style="font-size:12px;color:var(--muted);font-family:var(--font-mono)">${label}</span>
+    <button class="fn-nav" onclick="goToCurrentFortnight()" style="font-size:12px;padding:6px 12px">Today</button>
+  `;
+}
+
+function shiftFortnight(dir) {
+  currentFnIndex += dir;
   renderPayroll();
 }
 
-function renderPayroll() {
-  const from = document.getElementById('pay-from')?.value;
-  const to   = document.getElementById('pay-to')?.value;
-  let filtered = records;
-  if (from) filtered = filtered.filter(r => r.date >= from);
-  if (to)   filtered = filtered.filter(r => r.date <= to);
+function goToCurrentFortnight() {
+  currentFnIndex = getFortnightIndex(new Date());
+  renderPayroll();
+}
 
-  document.getElementById('payroll-cards').innerHTML = employees.map(emp => {
-    const empRecords = filtered.filter(r => r.empName === emp.name);
-    const gross      = empRecords.reduce((s, r) => s + r.dailyPay, 0);
-    const loanTotal  = loans.filter(l => l.empName === emp.name).reduce((s, l) => s + l.amount, 0);
-    const net        = gross - loanTotal;
+async function renderPayroll() {
+  renderFortnightBar();
+
+  const { start, end } = getFortnightRange(currentFnIndex);
+  const fromStr = dateStr(start);
+  const toStr   = dateStr(end);
+
+  // Load pay runs
+  const payRuns = await storageGet('wt_payruns') || [];
+  const fnKey   = `${fromStr}_${toStr}`;
+
+  // Filter records for this fortnight
+  const fnRecords = records.filter(r => r.date >= fromStr && r.date <= toStr);
+
+  // Summary strip
+  const totalGross    = fnRecords.reduce((s, r) => s + r.dailyPay, 0);
+  const paidRuns      = payRuns.filter(pr => pr.fnKey === fnKey);
+  const totalPaid     = paidRuns.reduce((s, pr) => s + pr.netPaid, 0);
+  const totalDeduct   = loans.reduce((s, l) => s + l.amount, 0);
+  const outstanding   = totalGross - totalDeduct - totalPaid;
+
+  document.getElementById('pay-summary-strip').innerHTML = `
+    <div class="ps-card"><div class="ps-label">Gross Pay</div><div class="ps-val" style="color:var(--accent2)">R ${totalGross.toFixed(2)}</div></div>
+    <div class="ps-card"><div class="ps-label">Deductions</div><div class="ps-val" style="color:var(--danger)">R ${totalDeduct.toFixed(2)}</div></div>
+    <div class="ps-card"><div class="ps-label">Already Paid</div><div class="ps-val" style="color:var(--warn)">R ${totalPaid.toFixed(2)}</div></div>
+    <div class="ps-card"><div class="ps-label">Still Owed</div><div class="ps-val" style="color:var(--accent)">R ${Math.max(0, outstanding).toFixed(2)}</div></div>
+  `;
+
+  // Per-employee cards
+  document.getElementById('payroll-cards').innerHTML = employees.map((emp, ei) => {
+    const empRecs    = fnRecords.filter(r => r.empName === emp.name);
+    const gross      = empRecs.reduce((s, r) => s + r.dailyPay, 0);
+    const empLoans   = loans.filter(l => l.empName === emp.name);
+    const loanTotal  = empLoans.reduce((s, l) => s + l.amount, 0);
+    const net        = Math.max(0, gross - loanTotal);
     const initial    = emp.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+    const paidRun    = paidRuns.find(pr => pr.empName === emp.name);
+    const isPaid     = !!paidRun;
+
+    const fullDays = empRecs.filter(r => r.dayType === 'full').length;
+    const halfDays = empRecs.filter(r => r.dayType === 'half').length;
+
+    const dayRows = empRecs.map(r => `
+      <div class="db-row">
+        <span>${r.date}</span>
+        <span>${r.site}</span>
+        <span>${r.dayType === 'full' ? 'Full' : 'Half'}</span>
+        <span style="color:var(--accent)">R ${r.dailyPay.toFixed(2)}</span>
+      </div>`).join('') || '<div class="db-row" style="justify-content:center">No shifts this period</div>';
+
     return `
-      <div class="payroll-card">
+      <div class="payroll-card ${isPaid ? 'paid' : ''}" id="pc-${ei}">
+        ${isPaid ? '<div class="paid-stamp">✔ PAID</div>' : ''}
         <h3><span style="display:inline-flex;align-items:center;gap:10px">
           <span style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--accent2),var(--accent));display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:var(--bg)">${initial}</span>
           ${emp.name}
         </span></h3>
-        <div class="pay-line"><span class="pay-key">Days Worked</span><span class="pay-val">${empRecords.length}</span></div>
+        <div class="pay-line"><span class="pay-key">Full Days</span><span class="pay-val">${fullDays}</span></div>
+        <div class="pay-line"><span class="pay-key">Half Days</span><span class="pay-val">${halfDays}</span></div>
         <div class="pay-line"><span class="pay-key">Daily Rate</span><span class="pay-val">R ${emp.rate.toFixed(2)}</span></div>
         <div class="pay-line"><span class="pay-key">Gross Pay</span><span class="pay-val" style="color:var(--accent2)">R ${gross.toFixed(2)}</span></div>
         <div class="pay-line"><span class="pay-key">Loan Deductions</span><span class="pay-val" style="color:var(--danger)">– R ${loanTotal.toFixed(2)}</span></div>
         <div class="pay-line total"><span class="pay-key">Net Pay</span><span class="pay-val">R ${net.toFixed(2)}</span></div>
+        <span class="db-toggle" onclick="toggleBreakdown(${ei})">▸ View day breakdown</span>
+        <div class="day-breakdown" id="db-${ei}">${dayRows}</div>
+        <div class="pay-action">
+          ${isPaid
+            ? `<button class="btn-unpay" onclick="markUnpaid(${ei}, '${fnKey}')">↩ Mark as Unpaid</button>`
+            : `<button class="btn-pay" onclick="markPaid(${ei}, '${fnKey}', ${net})" ${gross === 0 ? 'disabled' : ''}>
+                ${gross === 0 ? 'No shifts this period' : '✔ Mark as Paid  –  R ' + net.toFixed(2)}
+               </button>`
+          }
+        </div>
       </div>`;
   }).join('');
+
+  // Pay run history table
+  renderPayRunHistory(payRuns);
+}
+
+function toggleBreakdown(ei) {
+  const el = document.getElementById('db-' + ei);
+  el.classList.toggle('open');
+}
+
+async function markPaid(empIndex, fnKey, netAmount) {
+  const emp = employees[empIndex];
+  const payRuns = await storageGet('wt_payruns') || [];
+  payRuns.push({
+    id:       Date.now(),
+    fnKey,
+    empName:  emp.name,
+    netPaid:  netAmount,
+    datePaid: new Date().toISOString().split('T')[0],
+    period:   fnKey.replace('_', ' → '),
+  });
+  await storageSet('wt_payruns', payRuns);
+
+  // Clear that employee's loans on pay (they've been deducted)
+  loans = loans.filter(l => l.empName !== emp.name);
+  await storageSet('wt_loans', loans);
+
+  showToast(`${emp.name} marked as paid – R ${netAmount.toFixed(2)}`, 'success');
+  renderPayroll();
+  renderLoans();
+  renderStats();
+}
+
+async function markUnpaid(empIndex, fnKey) {
+  const emp = employees[empIndex];
+  const payRuns = await storageGet('wt_payruns') || [];
+  const updated = payRuns.filter(pr => !(pr.fnKey === fnKey && pr.empName === emp.name));
+  await storageSet('wt_payruns', updated);
+  showToast(`${emp.name} marked as unpaid`, 'success');
+  renderPayroll();
+}
+
+function renderPayRunHistory(payRuns) {
+  const tbody = document.getElementById('payrun-tbody');
+  if (!payRuns || !payRuns.length) {
+    tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="empty-icon">📭</div><p>No pay runs yet.</p></div></td></tr>';
+    return;
+  }
+  const sorted = [...payRuns].sort((a, b) => b.id - a.id);
+  tbody.innerHTML = sorted.map(pr => `
+    <tr>
+      <td class="mono" style="font-size:12px">${pr.period}</td>
+      <td><strong>${pr.empName}</strong></td>
+      <td class="blue">R ${(pr.netPaid + (pr.gross || 0) - (pr.net || pr.netPaid)).toFixed ? 'R ' + pr.netPaid.toFixed(2) : '—'}</td>
+      <td class="red">—</td>
+      <td class="green">R ${pr.netPaid.toFixed(2)}</td>
+      <td class="mono">${pr.datePaid}</td>
+    </tr>`).join('');
 }
 
 // ─────────────────────────────────────────
