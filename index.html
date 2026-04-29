@@ -500,7 +500,7 @@
       </div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Employee</th><th>Date</th><th>Clock In</th><th>Clock Out</th><th>Site</th><th>Type</th><th>Gross Pay</th></tr></thead>
+          <thead><tr><th>Employee</th><th>Date</th><th>Clock In</th><th>Clock Out</th><th>Site</th><th>Type</th><th>Gross Pay</th><th></th></tr></thead>
           <tbody id="records-tbody"></tbody>
         </table>
       </div>
@@ -590,17 +590,35 @@ let activeSessions = {}; // keyed by employee name
 // ─────────────────────────────────────────
 // PERSISTENT STORAGE HELPERS
 // ─────────────────────────────────────────
+// In-memory fallback store (used when window.storage unavailable)
+const _memStore = {};
+
 async function storageGet(key) {
-  try {
-    const result = await window.storage.get(key);
-    return result ? JSON.parse(result.value) : null;
-  } catch { return null; }
+  // Try persistent storage first
+  if (window.storage) {
+    try {
+      const result = await window.storage.get(key);
+      const val = result ? JSON.parse(result.value) : null;
+      if (val !== null) _memStore[key] = val; // keep mem in sync
+      return val !== null ? val : (_memStore[key] ?? null);
+    } catch(e) {
+      console.warn('storageGet failed for', key, e);
+    }
+  }
+  return _memStore[key] ?? null;
 }
 
 async function storageSet(key, value) {
-  try {
-    await window.storage.set(key, JSON.stringify(value));
-  } catch (e) { console.error('Storage set error:', e); }
+  // Always update memory immediately so reads within same session are instant
+  _memStore[key] = value;
+  if (window.storage) {
+    try {
+      await window.storage.set(key, JSON.stringify(value));
+      return;
+    } catch(e) {
+      console.warn('storageSet failed for', key, e);
+    }
+  }
 }
 
 // ─────────────────────────────────────────
@@ -642,8 +660,6 @@ async function init() {
   }
 
   renderEmployeeGrid();
-  document.getElementById('filter-date').value = new Date().toISOString().split('T')[0];
-
   // Hide loader
   const overlay = document.getElementById('loading-overlay');
   overlay.classList.add('hidden');
@@ -911,14 +927,19 @@ function switchTab(id, btn) {
 // REFRESH ALL ADMIN UI
 // ─────────────────────────────────────────
 async function refreshAdminUI() {
-  const [savedEmps, savedRecs, savedLoans] = await Promise.all([
-    storageGet('wt_employees'),
-    storageGet('wt_records'),
-    storageGet('wt_loans'),
-  ]);
-  employees      = savedEmps  || DEFAULT_EMPLOYEES;
-  records        = savedRecs  || [];
-  loans          = savedLoans || [];
+  // Use in-memory data (kept in sync by storageSet) — only fall back to storage if empty
+  if (!employees.length) {
+    const saved = await storageGet('wt_employees');
+    employees = saved || DEFAULT_EMPLOYEES;
+  }
+  if (!records.length) {
+    const saved = await storageGet('wt_records');
+    records = saved || [];
+  }
+  if (!loans.length) {
+    const saved = await storageGet('wt_loans');
+    loans = saved || [];
+  }
 
   renderStats();
   renderRecords();
@@ -950,6 +971,7 @@ function renderStats() {
 function renderRecords() {
   const empFilter  = document.getElementById('filter-emp')?.value  || '';
   const dateFilter = document.getElementById('filter-date')?.value || '';
+  // No default filter — show ALL records unless admin actively filters
   let filtered = records.filter(r => {
     if (empFilter  && r.empName !== empFilter) return false;
     if (dateFilter && r.date    !== dateFilter) return false;
@@ -958,7 +980,7 @@ function renderRecords() {
   filtered.sort((a, b) => new Date(b.clockInISO) - new Date(a.clockInISO));
   const tbody = document.getElementById('records-tbody');
   if (!filtered.length) {
-    tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">📭</div><p>No records found.</p></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">📭</div><p>No records yet. Clock in and out to create records.</p></div></td></tr>`;
     return;
   }
   tbody.innerHTML = filtered.map(r => `
@@ -970,7 +992,18 @@ function renderRecords() {
       <td>${r.site}</td>
       <td><span class="badge ${r.dayType === 'full' ? 'badge-full' : 'badge-half'}">${r.dayType === 'full' ? 'Full' : 'Half'}</span></td>
       <td class="green">R ${r.dailyPay.toFixed(2)}</td>
+      <td><button onclick="deleteRecord(${r.id})" style="background:rgba(232,79,61,0.12);border:1px solid rgba(232,79,61,0.3);color:var(--danger);border-radius:6px;padding:5px 10px;cursor:pointer;font-size:12px;transition:background 0.2s" onmouseover="this.style.background='rgba(232,79,61,0.25)'" onmouseout="this.style.background='rgba(232,79,61,0.12)'">✕</button></td>
     </tr>`).join('');
+}
+
+async function deleteRecord(id) {
+  if (!confirm('Permanently delete this record?')) return;
+  records = records.filter(r => r.id !== id);
+  await storageSet('wt_records', records);
+  renderRecords();
+  renderStats();
+  renderPayroll();
+  showToast('Record deleted.', 'success');
 }
 
 function clearFilters() {
