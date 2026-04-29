@@ -114,6 +114,8 @@
   .emp-status { font-size: 11px; font-family: var(--font-mono); margin-top: 5px; position: relative; z-index: 1; }
   .emp-status.in { color: var(--accent); }
   .emp-status.out { color: var(--muted); }
+  .emp-card.clocked-in { border-color: var(--accent); background: linear-gradient(135deg, rgba(61,232,160,0.08) 0%, var(--surface) 100%); }
+  .emp-card.clocked-in::before { opacity: 0.06; }
 
   .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 100; align-items: flex-end; justify-content: center; backdrop-filter: blur(4px); }
   .modal-overlay.open { display: flex; }
@@ -307,11 +309,11 @@
   <div class="ci-body">
     <div id="active-status" style="display:none">
       <div class="status-card">
-        <div class="status-badge">CLOCKED IN</div>
+        <div class="status-badge">WORKERS ON SITE</div>
         <div class="status-emp" id="active-emp-name"></div>
         <div class="status-detail" id="active-emp-detail"></div>
+        <div style="margin-top:10px;font-size:12px;color:var(--muted);font-family:var(--font-mono)">Tap a worker's card to clock them out</div>
       </div>
-      <button class="btn btn-danger" onclick="openClockOutModal()">⏹ Clock Out</button>
       <div style="height:24px"></div>
     </div>
     <div class="section-label">Select Your Name</div>
@@ -415,7 +417,10 @@
   <div class="admin-nav">
     <div class="nav-logo">WorkTrack</div>
     <div class="nav-title">Admin Dashboard</div>
-    <button class="nav-btn" onclick="adminLogout()">← Exit</button>
+    <div style="display:flex;gap:8px">
+      <button class="nav-btn" style="color:var(--danger);border-color:rgba(232,79,61,0.4)" onclick="clearAllSessions()">⚠ Clear Sessions</button>
+      <button class="nav-btn" onclick="adminLogout()">← Exit</button>
+    </div>
   </div>
   <div class="admin-body">
     <div class="tabs">
@@ -511,10 +516,10 @@ const ADMIN_PIN = '0000';
 // ─────────────────────────────────────────
 // STATE  (loaded from persistent storage)
 // ─────────────────────────────────────────
-let employees     = [];
-let records       = [];
-let loans         = [];
-let activeSession = null;
+let employees      = [];
+let records        = [];
+let loans          = [];
+let activeSessions = {}; // keyed by employee name
 
 // ─────────────────────────────────────────
 // PERSISTENT STORAGE HELPERS
@@ -555,9 +560,20 @@ async function init() {
     employees = savedEmps || DEFAULT_EMPLOYEES;
   }
 
-  records       = savedRecs   || [];
-  loans         = savedLoans  || [];
-  activeSession = savedActive || null;
+  records        = savedRecs   || [];
+  loans          = savedLoans  || [];
+  const rawSessions = savedActive || {};
+  // Sanitize: only keep sessions for currently known employees
+  activeSessions = {};
+  for (const emp of employees) {
+    if (rawSessions[emp.name]) {
+      activeSessions[emp.name] = rawSessions[emp.name];
+    }
+  }
+  // If sanitized sessions differ from saved, re-save the clean version
+  if (JSON.stringify(activeSessions) !== JSON.stringify(rawSessions)) {
+    await storageSet('wt_active', activeSessions);
+  }
 
   renderEmployeeGrid();
   document.getElementById('filter-date').value = new Date().toISOString().split('T')[0];
@@ -595,22 +611,25 @@ updateClock();
 function renderEmployeeGrid() {
   const grid = document.getElementById('employee-grid');
   grid.innerHTML = employees.map((emp, i) => {
-    const clocked = activeSession && activeSession.empName === emp.name;
+    const session = activeSessions[emp.name];
+    const clocked = !!session;
     const initial = emp.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
     return `
-      <div class="emp-card" onclick="selectEmployee(${i})">
-        <div class="emp-avatar">${initial}</div>
+      <div class="emp-card ${clocked ? 'clocked-in' : ''}" onclick="selectEmployee(${i})">
+        <div class="emp-avatar" style="${clocked ? 'background:linear-gradient(135deg,var(--accent),var(--accent2))' : ''}">${initial}</div>
         <div class="emp-name">${emp.name}</div>
-        <div class="emp-status ${clocked ? 'in' : 'out'}">${clocked ? '● IN' : '○ OUT'}</div>
+        <div class="emp-status ${clocked ? 'in' : 'out'}">${clocked ? '● IN since ' + session.clockIn : '○ OUT'}</div>
       </div>`;
   }).join('');
 
+  // Show count of clocked-in workers
+  const count = Object.keys(activeSessions).length;
   const banner = document.getElementById('active-status');
-  if (activeSession) {
+  if (count > 0) {
     banner.style.display = 'block';
-    document.getElementById('active-emp-name').textContent = activeSession.empName;
-    document.getElementById('active-emp-detail').textContent =
-      `${activeSession.site} · ${activeSession.dayType === 'full' ? 'Full Day' : 'Half Day'} · In since ${activeSession.clockIn}`;
+    document.getElementById('active-emp-name').textContent = `${count} worker${count > 1 ? 's' : ''} currently clocked in`;
+    const names = Object.keys(activeSessions).join(', ');
+    document.getElementById('active-emp-detail').textContent = names;
   } else {
     banner.style.display = 'none';
   }
@@ -624,16 +643,14 @@ let pinTarget = null;
 
 function selectEmployee(i) {
   const emp = employees[i];
-  if (activeSession && activeSession.empName === emp.name) { openClockOutModal(); return; }
-  if (activeSession && activeSession.empName !== emp.name) {
-    showToast(`${activeSession.empName} is currently clocked in. Please clock out first.`, 'error');
-    return;
-  }
+  // If already clocked in, go straight to clock-out (after PIN verify)
   pinTarget = i;
   pinBuffer = '';
   updatePinDots();
   document.getElementById('pin-modal-title').textContent = emp.name;
-  document.getElementById('pin-modal-subtitle').textContent = 'Enter your 4-digit PIN';
+  document.getElementById('pin-modal-subtitle').textContent = activeSessions[emp.name]
+    ? 'Enter PIN to clock out'
+    : 'Enter PIN to clock in';
   document.getElementById('pin-error').classList.remove('show');
   openModal('pin-modal');
 }
@@ -652,8 +669,18 @@ function updatePinDots() {
 }
 function validatePin() {
   const emp = employees[pinTarget];
-  if (pinBuffer === emp.pin) { closeModal('pin-modal'); openClockInModal(pinTarget); }
-  else { document.getElementById('pin-error').classList.add('show'); pinBuffer = ''; updatePinDots(); }
+  if (pinBuffer === emp.pin) {
+    closeModal('pin-modal');
+    if (activeSessions[emp.name]) {
+      openClockOutModal(pinTarget);
+    } else {
+      openClockInModal(pinTarget);
+    }
+  } else {
+    document.getElementById('pin-error').classList.add('show');
+    pinBuffer = '';
+    updatePinDots();
+  }
 }
 
 // ─────────────────────────────────────────
@@ -692,7 +719,7 @@ async function doClockIn() {
   const now = new Date();
   const emp = employees[clockInEmployeeIndex];
 
-  activeSession = {
+  activeSessions[emp.name] = {
     empName:    emp.name,
     empIndex:   clockInEmployeeIndex,
     date:       now.toISOString().split('T')[0],
@@ -702,7 +729,7 @@ async function doClockIn() {
     site:       site,
   };
 
-  await storageSet('wt_active', activeSession);
+  await storageSet('wt_active', activeSessions);
   closeModal('clockin-modal');
   renderEmployeeGrid();
   showToast(`${emp.name} clocked in ✔`, 'success');
@@ -711,42 +738,49 @@ async function doClockIn() {
 // ─────────────────────────────────────────
 // CLOCK-OUT
 // ─────────────────────────────────────────
-function openClockOutModal() {
-  if (!activeSession) return;
+let clockOutEmployeeIndex = null;
+
+function openClockOutModal(i) {
+  clockOutEmployeeIndex = i;
+  const emp = employees[i];
+  const session = activeSessions[emp.name];
+  if (!session) return;
   document.getElementById('clockout-detail').textContent =
-    `${activeSession.empName} · clocked in at ${activeSession.clockIn} · ${activeSession.site}`;
+    `${emp.name} · clocked in at ${session.clockIn} · ${session.site}`;
   openModal('clockout-modal');
 }
 
 async function doClockOut() {
-  if (!activeSession) return;
+  const emp = employees[clockOutEmployeeIndex];
+  const session = activeSessions[emp.name];
+  if (!session) return;
+
   const now = new Date();
-  const emp = employees.find(e => e.name === activeSession.empName);
   const rate = emp ? emp.rate : 350;
-  const dailyPay = activeSession.dayType === 'full' ? rate : rate * 0.5;
+  const dailyPay = session.dayType === 'full' ? rate : rate * 0.5;
 
   const record = {
     id:          Date.now(),
-    empName:     activeSession.empName,
-    date:        activeSession.date,
-    clockIn:     activeSession.clockIn,
-    clockInISO:  activeSession.clockInISO,
+    empName:     emp.name,
+    date:        session.date,
+    clockIn:     session.clockIn,
+    clockInISO:  session.clockInISO,
     clockOut:    now.toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' }),
     clockOutISO: now.toISOString(),
-    site:        activeSession.site,
-    dayType:     activeSession.dayType,
+    site:        session.site,
+    dayType:     session.dayType,
     dailyPay:    dailyPay,
   };
 
   records.push(record);
   await storageSet('wt_records', records);
 
-  activeSession = null;
-  await storageSet('wt_active', null);
+  delete activeSessions[emp.name];
+  await storageSet('wt_active', activeSessions);
 
   closeModal('clockout-modal');
   renderEmployeeGrid();
-  showToast(`Clocked out. Pay: R${dailyPay.toFixed(2)}`, 'success');
+  showToast(`${emp.name} clocked out. Pay: R${dailyPay.toFixed(2)}`, 'success');
 }
 
 // ─────────────────────────────────────────
@@ -787,6 +821,14 @@ function validateAdminPin() {
   if (adminPinBuffer === ADMIN_PIN) { showScreen('admin-screen'); refreshAdminUI(); }
   else { document.getElementById('admin-pin-error').classList.add('show'); adminPinBuffer = ''; updateAdminPinDots(); }
 }
+async function clearAllSessions() {
+  if (!confirm('Clear ALL active clock-in sessions? This will clock out everyone without saving a record.')) return;
+  activeSessions = {};
+  await storageSet('wt_active', activeSessions);
+  renderEmployeeGrid();
+  showToast('All sessions cleared.', 'success');
+}
+
 function adminLogout() { showScreen('clockin-screen'); }
 
 // ─────────────────────────────────────────
@@ -808,9 +850,9 @@ async function refreshAdminUI() {
     storageGet('wt_records'),
     storageGet('wt_loans'),
   ]);
-  employees = savedEmps  || DEFAULT_EMPLOYEES;
-  records   = savedRecs  || [];
-  loans     = savedLoans || [];
+  employees      = savedEmps  || DEFAULT_EMPLOYEES;
+  records        = savedRecs  || [];
+  loans          = savedLoans || [];
 
   renderStats();
   renderRecords();
