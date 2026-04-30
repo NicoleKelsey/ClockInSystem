@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>WorkTrack – Clock In & Payroll</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Sora:wght@300;400;600;700;800&display=swap" rel="stylesheet" />
+
+<!-- ✅ Firebase SDK (v9 compat mode — works in plain HTML) -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
 <style>
   :root {
     --bg: #0d0f14;
@@ -42,6 +47,7 @@
     opacity: 0.4;
   }
 
+  /* Loading overlay */
   #loading-overlay {
     position: fixed;
     inset: 0;
@@ -66,9 +72,35 @@
   }
   @keyframes spin { to { transform: rotate(360deg); } }
 
+  /* Firebase status badge */
+  .fb-status {
+    position: fixed;
+    top: 12px;
+    right: 12px;
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 5px 12px;
+    font-size: 11px;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    color: var(--muted);
+    transition: all 0.3s;
+  }
+  .fb-status.connected { border-color: rgba(61,232,160,0.4); color: var(--accent); }
+  .fb-status.connected::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); animation: pulse 1.5s ease-in-out infinite; }
+  .fb-status.disconnected { border-color: rgba(232,79,61,0.4); color: var(--danger); }
+  .fb-status.disconnected::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--danger); }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+
   .screen { display: none; position: relative; z-index: 1; }
   .screen.active { display: block; }
 
+  /* CLOCK-IN SCREEN */
   #clockin-screen { min-height: 100vh; padding: 0 0 40px; }
 
   .ci-header {
@@ -182,13 +214,13 @@
   .status-card { background: linear-gradient(135deg, rgba(61,232,160,0.1) 0%, rgba(61,159,232,0.05) 100%); border: 1.5px solid var(--accent); border-radius: var(--card-radius); padding: 22px; margin-bottom: 20px; }
   .status-card .status-badge { display: inline-flex; align-items: center; gap: 7px; background: rgba(61,232,160,0.15); border: 1px solid rgba(61,232,160,0.3); border-radius: 20px; padding: 5px 12px; font-size: 12px; font-weight: 700; color: var(--accent); font-family: var(--font-mono); margin-bottom: 14px; }
   .status-card .status-badge::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: pulse 1.5s ease-in-out infinite; }
-  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
   .status-card .status-emp { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
   .status-card .status-detail { font-size: 13px; color: var(--muted); font-family: var(--font-mono); }
 
   .error-msg { background: rgba(232,79,61,0.15); border: 1px solid rgba(232,79,61,0.4); border-radius: 8px; padding: 12px 16px; font-size: 14px; color: var(--danger); margin-bottom: 14px; display: none; }
   .error-msg.show { display: block; }
 
+  /* ADMIN */
   #admin-screen { min-height: 100vh; background: var(--bg); }
 
   .admin-nav { background: var(--surface); border-bottom: 1px solid var(--border); padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 50; }
@@ -265,7 +297,7 @@
 
   .day-breakdown { margin-top: 10px; border-top: 1px solid var(--border); padding-top: 10px; display: none; }
   .day-breakdown.open { display: block; }
-  .db-toggle { font-size: 11px; color: var(--muted); cursor: pointer; font-family: var(--font-mono); margin-top: 8px; user-select: none; display: block; }
+  .db-toggle { font-size: 11px; color: var(--muted); cursor: pointer; font-family: var(--font-mono); margin-top: 8px; user-select: none; }
   .db-toggle:hover { color: var(--accent2); }
   .db-row { display: flex; justify-content: space-between; font-size: 12px; font-family: var(--font-mono); padding: 4px 0; color: var(--muted); border-bottom: 1px solid rgba(42,48,64,0.5); }
   .db-row:last-child { border-bottom: none; }
@@ -311,32 +343,14 @@
   .pay-summary-strip .ps-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; }
   .pay-summary-strip .ps-label { font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); font-family: var(--font-mono); margin-bottom: 6px; }
   .pay-summary-strip .ps-val { font-size: 22px; font-weight: 800; }
-
-  /* Firebase status indicator */
-  .storage-indicator { position: fixed; top: 10px; right: 10px; font-size: 10px; font-family: var(--font-mono); padding: 4px 10px; border-radius: 20px; z-index: 9998; opacity: 0.9; cursor: default; }
-  .storage-indicator.connected { background: rgba(61,232,160,0.15); border: 1px solid rgba(61,232,160,0.3); color: var(--accent); }
-  .storage-indicator.connecting { background: rgba(61,159,232,0.15); border: 1px solid rgba(61,159,232,0.3); color: var(--accent2); }
-  .storage-indicator.offline { background: rgba(232,131,61,0.15); border: 1px solid rgba(232,131,61,0.3); color: var(--warn); }
-  .storage-indicator.error { background: rgba(232,79,61,0.15); border: 1px solid rgba(232,79,61,0.3); color: var(--danger); }
-
-  /* Firebase config setup screen */
-  #setup-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
-  .setup-box { background: var(--surface); border: 1px solid var(--border); border-radius: 24px; padding: 40px 32px; max-width: 560px; width: 100%; }
-  .setup-box h2 { font-size: 24px; font-weight: 800; margin-bottom: 8px; }
-  .setup-box .setup-sub { font-size: 13px; color: var(--muted); font-family: var(--font-mono); margin-bottom: 28px; line-height: 1.6; }
-  .setup-steps { counter-reset: step; margin-bottom: 28px; }
-  .setup-step { display: flex; gap: 14px; margin-bottom: 16px; }
-  .setup-step-num { counter-increment: step; width: 28px; height: 28px; border-radius: 50%; background: var(--accent); color: var(--bg); font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px; }
-  .setup-step-text { font-size: 13px; color: var(--muted); line-height: 1.6; }
-  .setup-step-text strong { color: var(--text); }
-  .setup-box textarea { width: 100%; background: var(--surface2); border: 1.5px solid var(--border); border-radius: 10px; padding: 14px 16px; color: var(--text); font-size: 12px; font-family: var(--font-mono); height: 160px; resize: vertical; outline: none; transition: border-color 0.2s; margin-bottom: 16px; }
-  .setup-box textarea:focus { border-color: var(--accent); }
-  .setup-error { background: rgba(232,79,61,0.12); border: 1px solid rgba(232,79,61,0.3); border-radius: 8px; padding: 12px 16px; font-size: 13px; color: var(--danger); margin-bottom: 14px; font-family: var(--font-mono); display: none; }
-  .setup-error.show { display: block; }
 </style>
 </head>
 <body>
 
+<!-- Firebase connection badge -->
+<div class="fb-status" id="fb-status">● Firebase</div>
+
+<!-- Loading overlay -->
 <div id="loading-overlay">
   <div class="loading-logo">WorkTrack</div>
   <div class="loading-spinner"></div>
@@ -344,39 +358,8 @@
 </div>
 
 <div class="toast" id="toast"></div>
-<div class="storage-indicator connecting" id="storage-indicator">◌ Connecting…</div>
 
-<!-- ══════════════════════════════════════════
-     SETUP SCREEN (shown if no Firebase config)
-     ══════════════════════════════════════════ -->
-<div id="setup-screen" class="screen">
-  <div class="setup-box">
-    <div style="font-size:13px;font-weight:700;letter-spacing:4px;text-transform:uppercase;color:var(--accent);font-family:var(--font-mono);margin-bottom:12px">WorkTrack</div>
-    <h2>Connect Firebase</h2>
-    <p class="setup-sub">Paste your Firebase config below to enable cloud sync across all devices. Your data will be stored in Firestore (free tier).</p>
-    <div class="setup-steps">
-      <div class="setup-step"><div class="setup-step-num">1</div><div class="setup-step-text">Go to <strong>console.firebase.google.com</strong> → Add project → name it <strong>worktrack</strong></div></div>
-      <div class="setup-step"><div class="setup-step-num">2</div><div class="setup-step-text">Go to <strong>Firestore Database</strong> → Create database → Start in <strong>test mode</strong> → choose a region close to you</div></div>
-      <div class="setup-step"><div class="setup-step-num">3</div><div class="setup-step-text">Go to <strong>Project Settings</strong> (gear icon) → Your apps → click the <strong>&lt;/&gt; web icon</strong> → Register app → copy the <strong>firebaseConfig</strong> object</div></div>
-      <div class="setup-step"><div class="setup-step-num">4</div><div class="setup-step-text">Paste the entire <strong>firebaseConfig = { … }</strong> block below</div></div>
-    </div>
-    <label class="field-label">Firebase Config</label>
-    <textarea id="firebase-config-input" placeholder='const firebaseConfig = {
-  apiKey: "AIzaSy...",
-  authDomain: "your-app.firebaseapp.com",
-  projectId: "your-app",
-  storageBucket: "your-app.appspot.com",
-  messagingSenderId: "123456789",
-  appId: "1:123:web:abc"
-};'></textarea>
-    <div class="setup-error" id="setup-error">Could not parse config. Make sure you pasted the full firebaseConfig object.</div>
-    <button class="btn btn-primary" onclick="saveFirebaseConfig()">🔥 Connect & Save</button>
-  </div>
-</div>
-
-<!-- ══════════════════════════════════════
-     SCREEN 1: CLOCK-IN
-     ══════════════════════════════════════ -->
+<!-- SCREEN 1: CLOCK-IN -->
 <div id="clockin-screen" class="screen active">
   <div class="ci-header">
     <div class="logo">WorkTrack</div>
@@ -459,9 +442,7 @@
   </div>
 </div>
 
-<!-- ══════════════════════════════════════
-     SCREEN 2: ADMIN PIN GATE
-     ══════════════════════════════════════ -->
+<!-- SCREEN 2: ADMIN PIN GATE -->
 <div id="admin-gate-screen" class="screen">
   <div id="admin-pin-gate">
     <div class="gate-box">
@@ -492,9 +473,7 @@
   </div>
 </div>
 
-<!-- ══════════════════════════════════════
-     SCREEN 3: ADMIN DASHBOARD
-     ══════════════════════════════════════ -->
+<!-- SCREEN 3: ADMIN DASHBOARD -->
 <div id="admin-screen" class="screen">
   <div class="admin-nav">
     <div class="nav-logo">WorkTrack</div>
@@ -567,26 +546,49 @@
   </div>
 </div>
 
-<!-- ══════════════════════════════════════
-     FIREBASE SDK (compat — works from local files)
-     ══════════════════════════════════════ -->
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script>
-// ─── shim so the rest of the code is unchanged ───
-function initializeApp(cfg)   { return firebase.initializeApp(cfg); }
-function getFirestore(app)    { return app.firestore(); }
-function doc(db, col, id)     { return db.collection(col).doc(id); }
-async function getDoc(ref)    { const s = await ref.get(); return { exists: () => s.exists, data: () => (s.exists ? s.data() : null) }; }
-async function setDoc(ref, d) { return ref.set(d); }
-async function getDocs(colRef){ const s = await colRef.get(); return { docs: s.docs.map(d => ({ id: d.id, data: () => d.data() })) }; }
-function collection(db, col)  { return db.collection(col); }
-async function addDoc(colRef, d){ const r = await colRef.add(d); return r.id; }
-async function deleteDoc(ref) { return ref.delete(); }
+// ═══════════════════════════════════════════════════════════════
+// FIREBASE CONFIGURATION
+// ═══════════════════════════════════════════════════════════════
+const firebaseConfig = {
+  apiKey:            "AIzaSyBjsejjshE53XcEzoq57fYA94fy1xBam7o",
+  authDomain:        "worktrack-ac4dd.firebaseapp.com",
+  databaseURL:       "https://worktrack-ac4dd-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId:         "worktrack-ac4dd",
+  storageBucket:     "worktrack-ac4dd.firebasestorage.app",
+  messagingSenderId: "217506842093",
+  appId:             "1:217506842093:web:125d586eeea74564f693e4",
+  measurementId:     "G-RF07K34LY2"
+};
 
-// ─────────────────────────────────────────
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+// ─── Firebase helper refs ───
+const ref = {
+  employees:  () => db.ref('employees'),
+  records:    () => db.ref('records'),
+  loans:      () => db.ref('loans'),
+  sessions:   () => db.ref('activeSessions'),
+  payruns:    () => db.ref('payruns'),
+  empVersion: () => db.ref('meta/employeeVersion'),
+};
+
+// ─── Monitor connection state ───
+db.ref('.info/connected').on('value', snap => {
+  const el = document.getElementById('fb-status');
+  if (snap.val()) {
+    el.textContent  = '● Firebase';
+    el.className    = 'fb-status connected';
+  } else {
+    el.textContent  = '● Offline';
+    el.className    = 'fb-status disconnected';
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
 // DEFAULT DATA
-// ─────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
 const DEFAULT_EMPLOYEES = [
   { name: 'Willem',   pin: '1111', rate: 350 },
   { name: 'Adam',     pin: '2222', rate: 350 },
@@ -613,231 +615,170 @@ const DEFAULT_SITES = [
   'Warehouse',
 ];
 
-const ADMIN_PIN       = '0000';
-const EMPLOYEE_VERSION = 'v2';
+const ADMIN_PIN         = '0000';
+const EMPLOYEE_VERSION  = 'v2';
 
-// ─────────────────────────────────────────
-// STATE
-// ─────────────────────────────────────────
-let db             = null;
+// ═══════════════════════════════════════════════════════════════
+// IN-MEMORY STATE  (mirrors Firebase, updated by listeners)
+// ═══════════════════════════════════════════════════════════════
 let employees      = [];
 let records        = [];
 let loans          = [];
 let activeSessions = {};
-let payRuns        = [];
+let payruns        = [];
 
-// ─────────────────────────────────────────
-// STORAGE — Firestore helpers
-// ─────────────────────────────────────────
-
-// Read a single document from a collection by ID
-async function fbGet(colName, docId = 'data') {
-  try {
-    const snap = await getDoc(doc(db, colName, docId));
-    return snap.exists() ? snap.data() : null;
-  } catch(e) {
-    console.error('fbGet error', colName, e);
-    return null;
-  }
+// ═══════════════════════════════════════════════════════════════
+// FIREBASE READ HELPERS  (one-time promise-based reads)
+// ═══════════════════════════════════════════════════════════════
+function fbGet(refFn) {
+  return refFn().once('value').then(s => s.val());
 }
 
-// Write a single document
-async function fbSet(colName, data, docId = 'data') {
-  try {
-    await setDoc(doc(db, colName, docId), data);
-  } catch(e) {
-    console.error('fbSet error', colName, e);
-    showToast('⚠ Save failed – check connection', 'error');
-  }
+// Convert Firebase object (keyed by push-id) → flat array
+function objToArr(obj) {
+  if (!obj) return [];
+  return Object.entries(obj).map(([fbKey, val]) => ({ ...val, _fbKey: fbKey }));
 }
 
-// Get all docs from a collection, returned as array with their .id
-async function fbGetAll(colName) {
-  try {
-    const snap = await getDocs(collection(db, colName));
-    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
-  } catch(e) {
-    console.error('fbGetAll error', colName, e);
-    return [];
-  }
+// ═══════════════════════════════════════════════════════════════
+// FIREBASE WRITE HELPERS
+// ═══════════════════════════════════════════════════════════════
+async function fbSetEmployees(emps) {
+  // Store employees as an indexed object (stable keys = names)
+  const obj = {};
+  emps.forEach(e => { obj[e.name] = e; });
+  await ref.employees().set(obj);
 }
 
-// Add a new doc (auto-ID) to a collection
-async function fbAdd(colName, data) {
-  try {
-    const id = await addDoc(collection(db, colName), data);
-    return id;
-  } catch(e) {
-    console.error('fbAdd error', colName, e);
-    showToast('⚠ Save failed – check connection', 'error');
-    return null;
-  }
+async function fbSetSessions(sessions) {
+  await ref.sessions().set(sessions || {});
 }
 
-// Delete a doc by Firestore ID
-async function fbDelete(colName, docId) {
-  try {
-    await deleteDoc(doc(db, colName, docId));
-  } catch(e) {
-    console.error('fbDelete error', colName, e);
-    showToast('⚠ Delete failed – check connection', 'error');
-  }
+async function fbPushRecord(record) {
+  const newRef = await ref.records().push(record);
+  return newRef.key;
 }
 
-// ─────────────────────────────────────────
-// FIREBASE CONFIG — saved in localStorage so the user only enters it once
-// ─────────────────────────────────────────
-function loadSavedConfig() {
-  try {
-    const raw = localStorage.getItem('wt_firebase_config');
-    return raw ? JSON.parse(raw) : null;
-  } catch { return null; }
+async function fbDeleteRecord(fbKey) {
+  await ref.records().child(fbKey).remove();
 }
 
-function saveFirebaseConfigToLS(cfg) {
-  localStorage.setItem('wt_firebase_config', JSON.stringify(cfg));
+async function fbPushLoan(loan) {
+  const newRef = await ref.loans().push(loan);
+  return newRef.key;
 }
 
-// Called from the setup screen button
-window.saveFirebaseConfig = function() {
-  const raw = document.getElementById('firebase-config-input').value.trim();
-  const errEl = document.getElementById('setup-error');
-  errEl.classList.remove('show');
-
-  // Extract the object literal from the pasted text
-  let cfg;
-  try {
-    // Support "const firebaseConfig = {...}" or just "{...}"
-    const match = raw.match(/\{[\s\S]*\}/);
-    if (!match) throw new Error('No object found');
-    // Use Function constructor to safely evaluate the object literal
-    cfg = (new Function('return ' + match[0]))();
-    if (!cfg.apiKey || !cfg.projectId) throw new Error('Missing required fields');
-  } catch(e) {
-    errEl.textContent = 'Could not parse config: ' + e.message;
-    errEl.classList.add('show');
-    return;
-  }
-
-  saveFirebaseConfigToLS(cfg);
-  bootWithConfig(cfg);
-};
-
-// ─────────────────────────────────────────
-// BOOT
-// ─────────────────────────────────────────
-async function boot() {
-  const cfg = loadSavedConfig();
-  if (!cfg) {
-    // Show setup screen
-    document.getElementById('loading-overlay').classList.add('hidden');
-    showScreen('setup-screen');
-    return;
-  }
-  await bootWithConfig(cfg);
+async function fbDeleteLoan(fbKey) {
+  await ref.loans().child(fbKey).remove();
 }
 
-async function bootWithConfig(cfg) {
-  // Show loading overlay
-  const overlay = document.getElementById('loading-overlay');
-  overlay.classList.remove('hidden');
-  overlay.style.display = 'flex';
-  setLoadingStatus('Initialising Firebase…');
-  setStorageIndicator('connecting', '◌ Connecting…');
+async function fbPushPayrun(payrun) {
+  await ref.payruns().push(payrun);
+}
 
-  try {
-    // If Firebase already initialised (e.g. retry), reuse it
-    let app;
-    if (firebase.apps.length > 0) {
-      app = firebase.apps[0];
-    } else {
-      app = firebase.initializeApp(cfg);
+async function fbDeletePayrun(fnKey, empName) {
+  const snap = await ref.payruns().once('value');
+  const obj  = snap.val() || {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (v.fnKey === fnKey && v.empName === empName) {
+      await ref.payruns().child(k).remove();
     }
-    db = app.firestore();
-    setLoadingStatus('Loading data…');
-  } catch(e) {
-    setStorageIndicator('error', '✕ Firebase error');
-    overlay.classList.add('hidden');
-    showScreen('clockin-screen');
-    showToast('Firebase init failed – check config', 'error');
-    console.error(e);
-    return;
   }
+}
 
-  // Load all data in parallel
+// ═══════════════════════════════════════════════════════════════
+// REAL-TIME LISTENERS  (keep UI in sync across devices)
+// ═══════════════════════════════════════════════════════════════
+function attachListeners() {
+  // Active sessions — live sync
+  ref.sessions().on('value', snap => {
+    activeSessions = snap.val() || {};
+    renderEmployeeGrid();
+  });
+
+  // Records — live sync
+  ref.records().on('value', snap => {
+    records = objToArr(snap.val());
+  });
+
+  // Loans — live sync
+  ref.loans().on('value', snap => {
+    loans = objToArr(snap.val());
+  });
+
+  // Employees — live sync
+  ref.employees().on('value', snap => {
+    const raw = snap.val();
+    if (raw) employees = Object.values(raw);
+    renderEmployeeGrid();
+  });
+
+  // Pay runs — live sync
+  ref.payruns().on('value', snap => {
+    payruns = objToArr(snap.val());
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════
+async function init() {
+  document.getElementById('loading-status').textContent = 'Connecting to Firebase…';
+
   try {
-    const [empData, empVer, recData, loanData, activeData, payRunData] = await Promise.all([
-      fbGet('config', 'employees'),
-      fbGet('config', 'emp_version'),
-      fbGetAll('records'),
-      fbGetAll('loans'),
-      fbGet('config', 'active_sessions'),
-      fbGetAll('pay_runs'),
+    // Check employee version — seed defaults if first launch
+    const savedVer = await fbGet(ref.empVersion);
+    if (savedVer !== EMPLOYEE_VERSION) {
+      document.getElementById('loading-status').textContent = 'Seeding employee data…';
+      await fbSetEmployees(DEFAULT_EMPLOYEES);
+      await ref.empVersion().set(EMPLOYEE_VERSION);
+      employees = [...DEFAULT_EMPLOYEES];
+    } else {
+      const empRaw = await fbGet(ref.employees);
+      employees = empRaw ? Object.values(empRaw) : DEFAULT_EMPLOYEES;
+    }
+
+    // Load initial data
+    const [recsRaw, loansRaw, sessRaw, payrunsRaw] = await Promise.all([
+      fbGet(ref.records),
+      fbGet(ref.loans),
+      fbGet(ref.sessions),
+      fbGet(ref.payruns),
     ]);
 
-    // Employees — reset if version changed
-    if (!empVer || empVer.version !== EMPLOYEE_VERSION) {
-      employees = DEFAULT_EMPLOYEES;
-      await fbSet('config', { list: employees }, 'employees');
-      await fbSet('config', { version: EMPLOYEE_VERSION }, 'emp_version');
-    } else {
-      employees = (empData && empData.list) ? empData.list : DEFAULT_EMPLOYEES;
-    }
+    records        = objToArr(recsRaw);
+    loans          = objToArr(loansRaw);
+    activeSessions = sessRaw  || {};
+    payruns        = objToArr(payrunsRaw);
 
-    // Records — each record is its own Firestore doc
-    records = recData || [];
+    // Attach real-time listeners
+    attachListeners();
 
-    // Loans — each loan is its own Firestore doc
-    loans = loanData || [];
+    renderEmployeeGrid();
+    document.getElementById('loading-status').textContent = 'Connected ✔';
 
-    // Pay runs — each pay run is its own Firestore doc
-    payRuns = payRunData || [];
-
-    // Active sessions
-    const rawSessions = (activeData && activeData.sessions) ? activeData.sessions : {};
-    activeSessions = {};
-    for (const emp of employees) {
-      if (rawSessions[emp.name]) activeSessions[emp.name] = rawSessions[emp.name];
-    }
-
-  } catch(e) {
-    console.error('Data load error:', e);
-    setStorageIndicator('offline', '⚠ Load error');
-    showToast('Failed to load data from Firebase', 'error');
+  } catch (err) {
+    console.error('Firebase init error:', err);
+    document.getElementById('loading-status').textContent = '⚠ Connection failed — check Firebase rules';
   }
 
-  setStorageIndicator('connected', '● Firebase connected');
-  renderEmployeeGrid();
-
   // Hide loader
+  const overlay = document.getElementById('loading-overlay');
   overlay.classList.add('hidden');
-  setTimeout(() => { overlay.style.display = 'none'; }, 500);
-
-  showScreen('clockin-screen');
+  setTimeout(() => overlay.remove(), 600);
 }
 
-function setLoadingStatus(msg) {
-  const el = document.getElementById('loading-status');
-  if (el) el.textContent = msg;
-}
-
-function setStorageIndicator(cls, msg) {
-  const el = document.getElementById('storage-indicator');
-  el.className = 'storage-indicator ' + cls;
-  el.textContent = msg;
-}
-
-// ─────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
 // SCREEN SWITCHING
-// ─────────────────────────────────────────
-window.showScreen = function(id) {
+// ═══════════════════════════════════════════════════════════════
+function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
-};
+}
 
-// ─────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
 // LIVE CLOCK
-// ─────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
 function updateClock() {
   const el = document.getElementById('live-time');
   if (el) el.textContent = new Date().toLocaleString('en-ZA', {
@@ -848,15 +789,16 @@ function updateClock() {
 setInterval(updateClock, 1000);
 updateClock();
 
-// ─────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
 // EMPLOYEE GRID
-// ─────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
 function renderEmployeeGrid() {
   const grid = document.getElementById('employee-grid');
+  if (!grid) return;
   grid.innerHTML = employees.map((emp, i) => {
     const session = activeSessions[emp.name];
     const clocked  = !!session;
-    const initial  = emp.name.split(' ').map(n => n[0]).join('').substring(0,2).toUpperCase();
+    const initial  = emp.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
     return `
       <div class="emp-card ${clocked ? 'clocked-in' : ''}" onclick="selectEmployee(${i})">
         <div class="emp-avatar" style="${clocked ? 'background:linear-gradient(135deg,var(--accent),var(--accent2))' : ''}">${initial}</div>
@@ -876,39 +818,35 @@ function renderEmployeeGrid() {
   }
 }
 
-// ─────────────────────────────────────────
-// PIN MODAL
-// ─────────────────────────────────────────
-let pinBuffer = '';
-let pinTarget = null;
+// ═══════════════════════════════════════════════════════════════
+// PIN MODAL (employee login)
+// ═══════════════════════════════════════════════════════════════
+let pinBuffer  = '';
+let pinTarget  = null;
 
-window.selectEmployee = function(i) {
-  pinTarget = i;
-  pinBuffer = '';
+function selectEmployee(i) {
+  pinTarget  = i;
+  pinBuffer  = '';
   updatePinDots();
-  const emp = employees[i];
+  const emp  = employees[i];
   document.getElementById('pin-modal-title').textContent    = emp.name;
   document.getElementById('pin-modal-subtitle').textContent = activeSessions[emp.name]
     ? 'Enter PIN to clock out'
     : 'Enter PIN to clock in';
   document.getElementById('pin-error').classList.remove('show');
   openModal('pin-modal');
-};
-
-window.pinKey   = function(d) { if (pinBuffer.length >= 4) return; pinBuffer += d; updatePinDots(); if (pinBuffer.length === 4) setTimeout(validatePin, 200); };
-window.pinDel   = function()  { pinBuffer = pinBuffer.slice(0,-1); updatePinDots(); };
-window.pinClear = function()  { pinBuffer = ''; updatePinDots(); };
-
-function updatePinDots() {
-  for (let i = 0; i < 4; i++)
-    document.getElementById('d'+i).classList.toggle('filled', i < pinBuffer.length);
 }
+
+function pinKey(digit)  { if (pinBuffer.length >= 4) return; pinBuffer += digit; updatePinDots(); if (pinBuffer.length === 4) setTimeout(validatePin, 200); }
+function pinDel()       { pinBuffer = pinBuffer.slice(0, -1); updatePinDots(); }
+function pinClear()     { pinBuffer = ''; updatePinDots(); }
+function updatePinDots()  { for (let i = 0; i < 4; i++) document.getElementById('d'+i).classList.toggle('filled', i < pinBuffer.length); }
+
 function validatePin() {
   const emp = employees[pinTarget];
   if (pinBuffer === emp.pin) {
     closeModal('pin-modal');
-    if (activeSessions[emp.name]) openClockOutModal(pinTarget);
-    else                          openClockInModal(pinTarget);
+    activeSessions[emp.name] ? openClockOutModal(pinTarget) : openClockInModal(pinTarget);
   } else {
     document.getElementById('pin-error').classList.add('show');
     pinBuffer = '';
@@ -916,15 +854,15 @@ function validatePin() {
   }
 }
 
-// ─────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
 // CLOCK-IN MODAL
-// ─────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
 let clockInEmployeeIndex = null;
 let selectedDayType      = 'full';
 
 function openClockInModal(i) {
   clockInEmployeeIndex = i;
-  selectedDayType = 'full';
+  selectedDayType      = 'full';
   document.getElementById('btn-full').classList.add('selected');
   document.getElementById('btn-half').classList.remove('selected');
   document.getElementById('clockin-modal-title').textContent = `Clock In – ${employees[i].name}`;
@@ -938,13 +876,13 @@ function openClockInModal(i) {
   openModal('clockin-modal');
 }
 
-window.selectDayType = function(type) {
+function selectDayType(type) {
   selectedDayType = type;
   document.getElementById('btn-full').classList.toggle('selected', type === 'full');
   document.getElementById('btn-half').classList.toggle('selected', type === 'half');
-};
+}
 
-window.doClockIn = async function() {
+async function doClockIn() {
   const site = document.getElementById('site-select').value;
   if (!site) { document.getElementById('clockin-error').classList.add('show'); return; }
   document.getElementById('clockin-error').classList.remove('show');
@@ -952,25 +890,27 @@ window.doClockIn = async function() {
   const now = new Date();
   const emp = employees[clockInEmployeeIndex];
 
-  activeSessions[emp.name] = {
+  // Write session to Firebase
+  const sessionData = {
     empName:    emp.name,
     empIndex:   clockInEmployeeIndex,
     date:       now.toISOString().split('T')[0],
     clockIn:    now.toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' }),
     clockInISO: now.toISOString(),
     dayType:    selectedDayType,
-    site:       site,
+    site,
   };
 
-  await fbSet('config', { sessions: activeSessions }, 'active_sessions');
-  closeModal('clockin-modal');
-  renderEmployeeGrid();
-  showToast(`${emp.name} clocked in ✔`, 'success');
-};
+  activeSessions[emp.name] = sessionData;
+  await ref.sessions().child(emp.name).set(sessionData);
 
-// ─────────────────────────────────────────
+  closeModal('clockin-modal');
+  showToast(`${emp.name} clocked in ✔`, 'success');
+}
+
+// ═══════════════════════════════════════════════════════════════
 // CLOCK-OUT
-// ─────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
 let clockOutEmployeeIndex = null;
 
 function openClockOutModal(i) {
@@ -983,7 +923,7 @@ function openClockOutModal(i) {
   openModal('clockout-modal');
 }
 
-window.doClockOut = async function() {
+async function doClockOut() {
   const emp     = employees[clockOutEmployeeIndex];
   const session = activeSessions[emp.name];
   if (!session) return;
@@ -992,6 +932,7 @@ window.doClockOut = async function() {
   const rate     = emp.rate || 350;
   const dailyPay = session.dayType === 'full' ? rate : rate * 0.5;
 
+  // Build record
   const record = {
     empName:     emp.name,
     date:        session.date,
@@ -1001,94 +942,74 @@ window.doClockOut = async function() {
     clockOutISO: now.toISOString(),
     site:        session.site,
     dayType:     session.dayType,
-    dailyPay:    dailyPay,
+    dailyPay,
   };
 
+  // Write record to Firebase (push generates unique key)
+  await ref.records().push(record);
+
+  // Remove session from Firebase
+  await ref.sessions().child(emp.name).remove();
   delete activeSessions[emp.name];
 
-  // Save record to its own Firestore doc, update sessions
-  const [newId] = await Promise.all([
-    fbAdd('records', record),
-    fbSet('config', { sessions: activeSessions }, 'active_sessions'),
-  ]);
-
-  // Add to local array with Firestore ID
-  records.push({ id: newId, ...record });
-
   closeModal('clockout-modal');
-  renderEmployeeGrid();
   showToast(`${emp.name} clocked out. Pay: R${dailyPay.toFixed(2)}`, 'success');
-};
+}
 
-// ─────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
 // MODAL HELPERS
-// ─────────────────────────────────────────
-window.openModal  = function(id) { document.getElementById(id).classList.add('open'); };
-window.closeModal = function(id) { document.getElementById(id).classList.remove('open'); };
+// ═══════════════════════════════════════════════════════════════
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 
 document.querySelectorAll('.modal-overlay').forEach(overlay => {
   overlay.addEventListener('click', function(e) { if (e.target === this) this.classList.remove('open'); });
 });
 
-// ─────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
 // ADMIN GATE
-// ─────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
 let adminPinBuffer = '';
 
-window.openAdminGate = function() {
+function openAdminGate() {
   adminPinBuffer = '';
   updateAdminPinDots();
   document.getElementById('admin-pin-error').classList.remove('show');
   showScreen('admin-gate-screen');
-};
-
-window.adminPinKey   = function(d) { if (adminPinBuffer.length >= 4) return; adminPinBuffer += d; updateAdminPinDots(); if (adminPinBuffer.length === 4) setTimeout(validateAdminPin, 200); };
-window.adminPinDel   = function()  { adminPinBuffer = adminPinBuffer.slice(0,-1); updateAdminPinDots(); };
-window.adminPinClear = function()  { adminPinBuffer = ''; updateAdminPinDots(); };
-
-function updateAdminPinDots() {
-  for (let i = 0; i < 4; i++)
-    document.getElementById('ad'+i).classList.toggle('filled', i < adminPinBuffer.length);
 }
+
+function adminPinKey(digit)  { if (adminPinBuffer.length >= 4) return; adminPinBuffer += digit; updateAdminPinDots(); if (adminPinBuffer.length === 4) setTimeout(validateAdminPin, 200); }
+function adminPinDel()       { adminPinBuffer = adminPinBuffer.slice(0, -1); updateAdminPinDots(); }
+function adminPinClear()     { adminPinBuffer = ''; updateAdminPinDots(); }
+function updateAdminPinDots(){ for (let i = 0; i < 4; i++) document.getElementById('ad'+i).classList.toggle('filled', i < adminPinBuffer.length); }
+
 function validateAdminPin() {
   if (adminPinBuffer === ADMIN_PIN) { showScreen('admin-screen'); refreshAdminUI(); }
   else { document.getElementById('admin-pin-error').classList.add('show'); adminPinBuffer = ''; updateAdminPinDots(); }
 }
 
-window.clearAllSessions = async function() {
+async function clearAllSessions() {
   if (!confirm('Clear ALL active clock-in sessions? This will clock out everyone without saving a record.')) return;
-  activeSessions = {};
-  await fbSet('config', { sessions: activeSessions }, 'active_sessions');
-  renderEmployeeGrid();
+  await ref.sessions().remove();
   showToast('All sessions cleared.', 'success');
-};
+}
 
-window.adminLogout = function() { showScreen('clockin-screen'); };
+function adminLogout() { showScreen('clockin-screen'); }
 
-// ─────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
 // ADMIN TABS
-// ─────────────────────────────────────────
-window.switchTab = function(id, btn) {
+// ═══════════════════════════════════════════════════════════════
+function switchTab(id, btn) {
   document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.getElementById(id).classList.add('active');
   btn.classList.add('active');
-};
+}
 
-// ─────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
 // REFRESH ALL ADMIN UI
-// ─────────────────────────────────────────
-async function refreshAdminUI() {
-  // Re-fetch fresh from Firestore
-  const [recData, loanData, payRunData] = await Promise.all([
-    fbGetAll('records'),
-    fbGetAll('loans'),
-    fbGetAll('pay_runs'),
-  ]);
-  records  = recData    || [];
-  loans    = loanData   || [];
-  payRuns  = payRunData || [];
-
+// ═══════════════════════════════════════════════════════════════
+function refreshAdminUI() {
   renderStats();
   renderRecords();
   renderPayroll();
@@ -1098,24 +1019,24 @@ async function refreshAdminUI() {
   currentFnIndex = getFortnightIndex(new Date());
 }
 
-// ─────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
 // STATS
-// ─────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
 function renderStats() {
   const totalShifts = records.length;
-  const totalGross  = records.reduce((s,r) => s+(r.dailyPay||0), 0);
-  const totalLoans  = loans.reduce((s,l) => s+(l.amount||0), 0);
+  const totalGross  = records.reduce((s, r) => s + r.dailyPay, 0);
+  const totalLoans  = loans.reduce((s, l) => s + l.amount, 0);
   const net         = totalGross - totalLoans;
   document.getElementById('stats-row').innerHTML = `
     <div class="stat-card"><div class="stat-label">Total Shifts</div><div class="stat-value blue">${totalShifts}</div></div>
     <div class="stat-card"><div class="stat-label">Gross Pay</div><div class="stat-value green">R ${totalGross.toFixed(2)}</div></div>
     <div class="stat-card"><div class="stat-label">Loans</div><div class="stat-value orange">R ${totalLoans.toFixed(2)}</div></div>
-    <div class="stat-card"><div class="stat-label">Net Pay</div><div class="stat-value ${net>=0?'green':'orange'}">R ${net.toFixed(2)}</div></div>`;
+    <div class="stat-card"><div class="stat-label">Net Pay</div><div class="stat-value ${net >= 0 ? 'green' : 'orange'}">R ${net.toFixed(2)}</div></div>`;
 }
 
-// ─────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
 // RECORDS TABLE
-// ─────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
 function renderRecords() {
   const empFilter  = document.getElementById('filter-emp')?.value  || '';
   const dateFilter = document.getElementById('filter-date')?.value || '';
@@ -1124,10 +1045,11 @@ function renderRecords() {
     if (dateFilter && r.date    !== dateFilter) return false;
     return true;
   });
-  filtered.sort((a,b) => new Date(b.clockInISO) - new Date(a.clockInISO));
+  filtered.sort((a, b) => new Date(b.clockInISO) - new Date(a.clockInISO));
+
   const tbody = document.getElementById('records-tbody');
   if (!filtered.length) {
-    tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">📭</div><p>No records found.</p></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">📭</div><p>No records yet. Clock in and out to create records.</p></div></td></tr>`;
     return;
   }
   tbody.innerHTML = filtered.map(r => `
@@ -1135,38 +1057,38 @@ function renderRecords() {
       <td><strong>${r.empName}</strong></td>
       <td class="mono">${r.date}</td>
       <td class="mono blue">${r.clockIn}</td>
-      <td class="mono orange">${r.clockOut||'—'}</td>
+      <td class="mono orange">${r.clockOut || '—'}</td>
       <td>${r.site}</td>
-      <td><span class="badge ${r.dayType==='full'?'badge-full':'badge-half'}">${r.dayType==='full'?'Full':'Half'}</span></td>
-      <td class="green">R ${(r.dailyPay||0).toFixed(2)}</td>
-      <td><button onclick="deleteRecord('${r.id}')" style="background:rgba(232,79,61,0.12);border:1px solid rgba(232,79,61,0.3);color:var(--danger);border-radius:6px;padding:5px 10px;cursor:pointer;font-size:12px" onmouseover="this.style.background='rgba(232,79,61,0.25)'" onmouseout="this.style.background='rgba(232,79,61,0.12)'">✕</button></td>
+      <td><span class="badge ${r.dayType === 'full' ? 'badge-full' : 'badge-half'}">${r.dayType === 'full' ? 'Full' : 'Half'}</span></td>
+      <td class="green">R ${r.dailyPay.toFixed(2)}</td>
+      <td><button onclick="deleteRecord('${r._fbKey}')" style="background:rgba(232,79,61,0.12);border:1px solid rgba(232,79,61,0.3);color:var(--danger);border-radius:6px;padding:5px 10px;cursor:pointer;font-size:12px;" onmouseover="this.style.background='rgba(232,79,61,0.25)'" onmouseout="this.style.background='rgba(232,79,61,0.12)'">✕</button></td>
     </tr>`).join('');
 }
 
-window.deleteRecord = async function(id) {
+async function deleteRecord(fbKey) {
   if (!confirm('Permanently delete this record?')) return;
-  await fbDelete('records', id);
-  records = records.filter(r => r.id !== id);
-  renderRecords(); renderStats(); renderPayroll();
+  await ref.records().child(fbKey).remove();
   showToast('Record deleted.', 'success');
-};
+  renderStats();
+  renderPayroll();
+}
 
-window.clearFilters = function() {
+function clearFilters() {
   document.getElementById('filter-emp').value  = '';
   document.getElementById('filter-date').value = '';
   renderRecords();
-};
+}
 
-// ─────────────────────────────────────────
-// FORTNIGHTLY PAYROLL
-// ─────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// PAYROLL – FORTNIGHTLY
+// ═══════════════════════════════════════════════════════════════
 const FN_EPOCH = new Date('2025-01-06');
 
 function getFortnightIndex(date) {
   const d = new Date(date); d.setHours(0,0,0,0);
-  const diff = Math.floor((d - FN_EPOCH) / (1000*60*60*24));
-  return Math.floor(diff / 14);
+  return Math.floor((d - FN_EPOCH) / (1000*60*60*24*14));
 }
+
 function getFortnightRange(index) {
   const start = new Date(FN_EPOCH);
   start.setDate(FN_EPOCH.getDate() + index * 14);
@@ -1174,7 +1096,8 @@ function getFortnightRange(index) {
   end.setDate(start.getDate() + 13);
   return { start, end };
 }
-function fmtDate(d)  { return d.toLocaleDateString('en-ZA', { day:'2-digit', month:'short', year:'numeric' }); }
+
+function fmtDate(d)  { return d.toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' }); }
 function dateStr(d)  { return d.toISOString().split('T')[0]; }
 
 let currentFnIndex = getFortnightIndex(new Date());
@@ -1185,7 +1108,8 @@ function renderFortnightBar() {
   const label = currentFnIndex === nowFn       ? '📅 Current Fortnight'
               : currentFnIndex === nowFn - 1   ? '⏮ Previous Fortnight'
               : currentFnIndex > nowFn         ? '⏭ Future'
-              : `Fortnight #${currentFnIndex+1}`;
+              : `Fortnight #${currentFnIndex + 1}`;
+
   document.getElementById('fortnight-bar').innerHTML = `
     <span class="fn-label">Pay Period</span>
     <button class="fn-nav" onclick="shiftFortnight(-1)">‹ Prev</button>
@@ -1196,50 +1120,52 @@ function renderFortnightBar() {
     <button class="fn-nav" onclick="goToCurrentFortnight()" style="font-size:12px;padding:6px 12px">Today</button>`;
 }
 
-window.shiftFortnight        = function(dir) { currentFnIndex += dir; renderPayroll(); };
-window.goToCurrentFortnight  = function()    { currentFnIndex = getFortnightIndex(new Date()); renderPayroll(); };
+function shiftFortnight(dir) { currentFnIndex += dir; renderPayroll(); }
+function goToCurrentFortnight() { currentFnIndex = getFortnightIndex(new Date()); renderPayroll(); }
 
-async function renderPayroll() {
+function renderPayroll() {
   renderFortnightBar();
+
   const { start, end } = getFortnightRange(currentFnIndex);
-  const fromStr = dateStr(start), toStr = dateStr(end);
+  const fromStr = dateStr(start);
+  const toStr   = dateStr(end);
   const fnKey   = `${fromStr}_${toStr}`;
 
-  const fnRecords = records.filter(r => r.date >= fromStr && r.date <= toStr);
-  const paidRuns  = payRuns.filter(pr => pr.fnKey === fnKey);
+  const fnRecords  = records.filter(r => r.date >= fromStr && r.date <= toStr);
+  const paidRuns   = payruns.filter(pr => pr.fnKey === fnKey);
 
-  const totalGross  = fnRecords.reduce((s,r) => s+(r.dailyPay||0), 0);
-  const totalPaid   = paidRuns.reduce((s,pr) => s+pr.netPaid, 0);
-  const totalDeduct = loans.reduce((s,l) => s+(l.amount||0), 0);
+  const totalGross  = fnRecords.reduce((s, r) => s + r.dailyPay, 0);
+  const totalPaid   = paidRuns.reduce((s, pr) => s + pr.netPaid, 0);
+  const totalDeduct = loans.reduce((s, l) => s + l.amount, 0);
   const outstanding = totalGross - totalDeduct - totalPaid;
 
   document.getElementById('pay-summary-strip').innerHTML = `
     <div class="ps-card"><div class="ps-label">Gross Pay</div><div class="ps-val" style="color:var(--accent2)">R ${totalGross.toFixed(2)}</div></div>
     <div class="ps-card"><div class="ps-label">Deductions</div><div class="ps-val" style="color:var(--danger)">R ${totalDeduct.toFixed(2)}</div></div>
     <div class="ps-card"><div class="ps-label">Already Paid</div><div class="ps-val" style="color:var(--warn)">R ${totalPaid.toFixed(2)}</div></div>
-    <div class="ps-card"><div class="ps-label">Still Owed</div><div class="ps-val" style="color:var(--accent)">R ${Math.max(0,outstanding).toFixed(2)}</div></div>`;
+    <div class="ps-card"><div class="ps-label">Still Owed</div><div class="ps-val" style="color:var(--accent)">R ${Math.max(0, outstanding).toFixed(2)}</div></div>`;
 
   document.getElementById('payroll-cards').innerHTML = employees.map((emp, ei) => {
     const empRecs   = fnRecords.filter(r => r.empName === emp.name);
-    const gross     = empRecs.reduce((s,r) => s+(r.dailyPay||0), 0);
+    const gross     = empRecs.reduce((s, r) => s + r.dailyPay, 0);
     const empLoans  = loans.filter(l => l.empName === emp.name);
-    const loanTotal = empLoans.reduce((s,l) => s+(l.amount||0), 0);
+    const loanTotal = empLoans.reduce((s, l) => s + l.amount, 0);
     const net       = Math.max(0, gross - loanTotal);
-    const initial   = emp.name.split(' ').map(n=>n[0]).join('').substring(0,2).toUpperCase();
-    const paidRun   = paidRuns.find(pr => pr.empName === emp.name);
-    const isPaid    = !!paidRun;
-    const fullDays  = empRecs.filter(r => r.dayType === 'full').length;
-    const halfDays  = empRecs.filter(r => r.dayType === 'half').length;
+    const initial   = emp.name.split(' ').map(n => n[0]).join('').substring(0,2).toUpperCase();
+    const isPaid    = !!paidRuns.find(pr => pr.empName === emp.name);
+
+    const fullDays = empRecs.filter(r => r.dayType === 'full').length;
+    const halfDays = empRecs.filter(r => r.dayType === 'half').length;
 
     const dayRows = empRecs.map(r => `
       <div class="db-row">
         <span>${r.date}</span><span>${r.site}</span>
-        <span>${r.dayType==='full'?'Full':'Half'}</span>
-        <span style="color:var(--accent)">R ${(r.dailyPay||0).toFixed(2)}</span>
+        <span>${r.dayType === 'full' ? 'Full' : 'Half'}</span>
+        <span style="color:var(--accent)">R ${r.dailyPay.toFixed(2)}</span>
       </div>`).join('') || '<div class="db-row" style="justify-content:center">No shifts this period</div>';
 
     return `
-      <div class="payroll-card ${isPaid?'paid':''}" id="pc-${ei}">
+      <div class="payroll-card ${isPaid ? 'paid' : ''}" id="pc-${ei}">
         ${isPaid ? '<div class="paid-stamp">✔ PAID</div>' : ''}
         <h3><span style="display:inline-flex;align-items:center;gap:10px">
           <span style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--accent2),var(--accent));display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:var(--bg)">${initial}</span>
@@ -1255,11 +1181,10 @@ async function renderPayroll() {
         <div class="day-breakdown" id="db-${ei}">${dayRows}</div>
         <div class="pay-action">
           ${isPaid
-            ? `<button class="btn-unpay" onclick="markUnpaid(${ei}, '${fnKey}', '${paidRun.id}')">↩ Mark as Unpaid</button>`
-            : `<button class="btn-pay" onclick="markPaid(${ei}, '${fnKey}', ${net})" ${gross===0?'disabled':''}>
-                ${gross===0 ? 'No shifts this period' : '✔ Mark as Paid  –  R '+net.toFixed(2)}
-               </button>`
-          }
+            ? `<button class="btn-unpay" onclick="markUnpaid('${fnKey}', '${emp.name}')">↩ Mark as Unpaid</button>`
+            : `<button class="btn-pay" onclick="markPaid(${ei}, '${fnKey}', ${net})" ${gross === 0 ? 'disabled' : ''}>
+                ${gross === 0 ? 'No shifts this period' : '✔ Mark as Paid  –  R ' + net.toFixed(2)}
+               </button>`}
         </div>
       </div>`;
   }).join('');
@@ -1267,76 +1192,88 @@ async function renderPayroll() {
   renderPayRunHistory();
 }
 
-window.toggleBreakdown = function(ei) { document.getElementById('db-'+ei).classList.toggle('open'); };
+function toggleBreakdown(ei) {
+  document.getElementById('db-' + ei).classList.toggle('open');
+}
 
-window.markPaid = async function(empIndex, fnKey, netAmount) {
+async function markPaid(empIndex, fnKey, netAmount) {
   const emp = employees[empIndex];
-  const run = {
-    fnKey, empName: emp.name, netPaid: netAmount,
-    datePaid: new Date().toISOString().split('T')[0],
-    period: fnKey.replace('_',' → '),
-  };
-  const newId = await fbAdd('pay_runs', run);
-  payRuns.push({ id: newId, ...run });
 
-  // Clear that employee's loans after pay
-  const empLoans = loans.filter(l => l.empName === emp.name);
-  for (const loan of empLoans) await fbDelete('loans', loan.id);
-  loans = loans.filter(l => l.empName !== emp.name);
+  await ref.payruns().push({
+    fnKey,
+    empName:  emp.name,
+    netPaid:  netAmount,
+    datePaid: new Date().toISOString().split('T')[0],
+    period:   fnKey.replace('_', ' → '),
+  });
+
+  // Clear this employee's loans (already deducted)
+  const empLoanKeys = loans.filter(l => l.empName === emp.name).map(l => l._fbKey);
+  for (const k of empLoanKeys) await ref.loans().child(k).remove();
 
   showToast(`${emp.name} marked as paid – R ${netAmount.toFixed(2)}`, 'success');
-  renderPayroll(); renderLoans(); renderStats();
-};
-
-window.markUnpaid = async function(empIndex, fnKey, runId) {
-  const emp = employees[empIndex];
-  await fbDelete('pay_runs', runId);
-  payRuns = payRuns.filter(pr => pr.id !== runId);
-  showToast(`${emp.name} marked as unpaid`, 'success');
   renderPayroll();
-};
+}
+
+async function markUnpaid(fnKey, empName) {
+  const snap = await ref.payruns().once('value');
+  const obj  = snap.val() || {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (v.fnKey === fnKey && v.empName === empName) {
+      await ref.payruns().child(k).remove();
+    }
+  }
+  showToast(`${empName} marked as unpaid`, 'success');
+  renderPayroll();
+}
 
 function renderPayRunHistory() {
   const tbody = document.getElementById('payrun-tbody');
-  if (!payRuns.length) {
+  if (!payruns.length) {
     tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="empty-icon">📭</div><p>No pay runs yet.</p></div></td></tr>';
     return;
   }
-  const sorted = [...payRuns].sort((a,b) => b.datePaid < a.datePaid ? 1 : -1);
+  const sorted = [...payruns].sort((a, b) => (b.datePaid > a.datePaid ? 1 : -1));
   tbody.innerHTML = sorted.map(pr => `
     <tr>
-      <td class="mono" style="font-size:12px">${pr.period}</td>
+      <td class="mono" style="font-size:12px">${pr.period || pr.fnKey}</td>
       <td><strong>${pr.empName}</strong></td>
-      <td class="blue">R ${pr.netPaid.toFixed(2)}</td>
+      <td class="blue">—</td>
       <td>—</td>
       <td class="green">R ${pr.netPaid.toFixed(2)}</td>
       <td class="mono">${pr.datePaid}</td>
     </tr>`).join('');
 }
 
-// ─────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
 // LOANS
-// ─────────────────────────────────────────
-window.addLoan = async function() {
+// ═══════════════════════════════════════════════════════════════
+async function addLoan() {
   const empName = document.getElementById('loan-emp').value;
   const amount  = parseFloat(document.getElementById('loan-amount').value);
   const reason  = document.getElementById('loan-reason').value.trim();
   if (!empName || isNaN(amount) || amount <= 0) { showToast('Please fill in employee and a valid amount.', 'error'); return; }
-  const loan = { empName, amount, reason: reason || 'No reason given', date: new Date().toISOString().split('T')[0] };
-  const newId = await fbAdd('loans', loan);
-  loans.push({ id: newId, ...loan });
+
+  await ref.loans().push({
+    empName,
+    amount,
+    reason: reason || 'No reason given',
+    date:   new Date().toISOString().split('T')[0],
+  });
+
   document.getElementById('loan-amount').value = '';
   document.getElementById('loan-reason').value = '';
-  renderLoans(); renderPayroll(); renderStats();
   showToast(`Loan of R${amount.toFixed(2)} added for ${empName}`, 'success');
-};
+  renderPayroll();
+  renderStats();
+}
 
-window.deleteLoan = async function(id) {
-  await fbDelete('loans', id);
-  loans = loans.filter(l => l.id !== id);
-  renderLoans(); renderPayroll(); renderStats();
+async function deleteLoan(fbKey) {
+  await ref.loans().child(fbKey).remove();
   showToast('Loan removed.', 'success');
-};
+  renderPayroll();
+  renderStats();
+}
 
 function renderLoans() {
   const container = document.getElementById('loan-list');
@@ -1346,17 +1283,17 @@ function renderLoans() {
       <div class="loan-info"><h4>${l.empName}</h4><p>${l.reason} · ${l.date}</p></div>
       <div style="display:flex;align-items:center;gap:12px">
         <div class="loan-amount">– R ${l.amount.toFixed(2)}</div>
-        <button class="loan-delete" onclick="deleteLoan('${l.id}')">Remove</button>
+        <button class="loan-delete" onclick="deleteLoan('${l._fbKey}')">Remove</button>
       </div>
     </div>`).join('');
 }
 
-// ─────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
 // EMPLOYEE MANAGEMENT
-// ─────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
 function renderEmployeeMgmt() {
   document.getElementById('emp-mgmt-grid').innerHTML = employees.map((emp, i) => {
-    const initial = emp.name.split(' ').map(n=>n[0]).join('').substring(0,2).toUpperCase();
+    const initial = emp.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
     return `
       <div class="emp-mgmt-card">
         <div class="emp-header">
@@ -1377,27 +1314,27 @@ function renderEmployeeMgmt() {
   }).join('');
 }
 
-window.saveRate = async function(i) {
+async function saveRate(i) {
   const val = parseFloat(document.getElementById(`rate-${i}`).value);
   if (isNaN(val) || val < 0) { showToast('Invalid rate.', 'error'); return; }
   employees[i].rate = val;
-  await fbSet('config', { list: employees }, 'employees');
+  await ref.employees().child(employees[i].name).update({ rate: val });
   showToast(`Rate updated for ${employees[i].name}`, 'success');
   renderPayroll();
-};
+}
 
-window.savePin = async function(i) {
+async function savePin(i) {
   const pin = document.getElementById(`newpin-${i}`).value.trim();
   if (!/^\d{4}$/.test(pin)) { showToast('PIN must be exactly 4 digits.', 'error'); return; }
   employees[i].pin = pin;
-  await fbSet('config', { list: employees }, 'employees');
+  await ref.employees().child(employees[i].name).update({ pin });
   document.getElementById(`newpin-${i}`).value = '';
   showToast(`PIN updated for ${employees[i].name}`, 'success');
-};
+}
 
-// ─────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
 // DROPDOWNS
-// ─────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
 function populateAdminDropdowns() {
   const fe = document.getElementById('filter-emp');
   if (fe) fe.innerHTML = '<option value="">All Employees</option>' +
@@ -1406,22 +1343,22 @@ function populateAdminDropdowns() {
   if (le) le.innerHTML = employees.map(e => `<option value="${e.name}">${e.name}</option>`).join('');
 }
 
-// ─────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
 // TOAST
-// ─────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
 let toastTimer = null;
-window.showToast = function(msg, type = 'success') {
-  const toast = document.getElementById('toast');
+function showToast(msg, type = 'success') {
+  const toast    = document.getElementById('toast');
   toast.textContent = msg;
-  toast.className = `toast ${type} show`;
+  toast.className   = `toast ${type} show`;
   if (toastTimer) clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => toast.classList.remove('show'), 3500);
-};
+  toastTimer = setTimeout(() => toast.classList.remove('show'), 3000);
+}
 
-// ─────────────────────────────────────────
-// START
-// ─────────────────────────────────────────
-boot();
+// ═══════════════════════════════════════════════════════════════
+// BOOT
+// ═══════════════════════════════════════════════════════════════
+init();
 </script>
 </body>
 </html>
