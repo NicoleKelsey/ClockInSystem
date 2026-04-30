@@ -489,6 +489,7 @@
       <button class="tab" onclick="switchTab('tab-payroll', this)">💰 Payroll</button>
       <button class="tab" onclick="switchTab('tab-loans', this)">📉 Loans</button>
       <button class="tab" onclick="switchTab('tab-employees', this)">👥 Employees</button>
+      <button class="tab" onclick="switchTab('tab-sites', this)">📍 Sites</button>
     </div>
 
     <div class="tab-pane active" id="tab-records">
@@ -543,6 +544,21 @@
     <div class="tab-pane" id="tab-employees">
       <div class="emp-mgmt-grid" id="emp-mgmt-grid"></div>
     </div>
+
+    <div class="tab-pane" id="tab-sites">
+      <div class="loan-form">
+        <h3>📍 Add New Site</h3>
+        <div style="display:flex;gap:12px;align-items:flex-end">
+          <div style="flex:1">
+            <label class="field-label">Site Name</label>
+            <input type="text" id="new-site-name" placeholder="e.g. Site E – Bloemfontein" style="margin-bottom:0" onkeydown="if(event.key==='Enter')addSite()" />
+          </div>
+          <button class="btn btn-primary" style="max-width:140px;margin-bottom:0;padding:14px 10px" onclick="addSite()">+ Add Site</button>
+        </div>
+      </div>
+      <div class="section-label">Active Sites</div>
+      <div class="loan-list" id="site-list"></div>
+    </div>
   </div>
 </div>
 
@@ -572,6 +588,7 @@ const ref = {
   sessions:   () => db.ref('activeSessions'),
   payruns:    () => db.ref('payruns'),
   empVersion: () => db.ref('meta/employeeVersion'),
+  sites:      () => db.ref('sites'),
 };
 
 // ─── Monitor connection state ───
@@ -627,6 +644,7 @@ let records        = [];
 let loans          = [];
 let activeSessions = {};
 let payruns        = [];
+let sites          = [];
 
 // ═══════════════════════════════════════════════════════════════
 // FIREBASE READ HELPERS  (one-time promise-based reads)
@@ -718,6 +736,12 @@ function attachListeners() {
   ref.payruns().on('value', snap => {
     payruns = objToArr(snap.val());
   });
+
+  // Sites — live sync
+  ref.sites().on('value', snap => {
+    const raw = snap.val();
+    sites = raw ? Object.entries(raw).map(([k, v]) => ({ _fbKey: k, name: v.name })) : [];
+  });
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -740,17 +764,28 @@ async function init() {
     }
 
     // Load initial data
-    const [recsRaw, loansRaw, sessRaw, payrunsRaw] = await Promise.all([
+    const [recsRaw, loansRaw, sessRaw, payrunsRaw, sitesRaw] = await Promise.all([
       fbGet(ref.records),
       fbGet(ref.loans),
       fbGet(ref.sessions),
       fbGet(ref.payruns),
+      fbGet(ref.sites),
     ]);
 
     records        = objToArr(recsRaw);
     loans          = objToArr(loansRaw);
     activeSessions = sessRaw  || {};
     payruns        = objToArr(payrunsRaw);
+
+    // Seed default sites if none exist yet
+    if (!sitesRaw) {
+      const sitesObj = {};
+      DEFAULT_SITES.forEach(s => { sitesObj[db.ref().push().key] = { name: s }; });
+      await ref.sites().set(sitesObj);
+      sites = Object.entries(sitesObj).map(([k, v]) => ({ _fbKey: k, name: v.name }));
+    } else {
+      sites = Object.entries(sitesRaw).map(([k, v]) => ({ _fbKey: k, name: v.name }));
+    }
 
     // Attach real-time listeners
     attachListeners();
@@ -873,7 +908,7 @@ function openClockInModal(i) {
   document.getElementById('clockin-error').classList.remove('show');
   const sel = document.getElementById('site-select');
   sel.innerHTML = '<option value="">-- Select Site --</option>' +
-    DEFAULT_SITES.map(s => `<option value="${s}">${s}</option>`).join('');
+    sites.map(s => `<option value="${s.name}">${s.name}</option>`).join('');
   openModal('clockin-modal');
 }
 
@@ -1016,6 +1051,7 @@ function refreshAdminUI() {
   renderPayroll();
   renderLoans();
   renderEmployeeMgmt();
+  renderSites();
   populateAdminDropdowns();
   currentFnIndex = getFortnightIndex(new Date());
 }
@@ -1332,6 +1368,54 @@ async function savePin(i) {
   document.getElementById(`newpin-${i}`).value = '';
   showToast(`PIN updated for ${employees[i].name}`, 'success');
 }
+
+// ═══════════════════════════════════════════════════════════════
+// SITES MANAGEMENT
+// ═══════════════════════════════════════════════════════════════
+async function addSite() {
+  const input = document.getElementById('new-site-name');
+  const name  = input.value.trim();
+  if (!name) { showToast('Please enter a site name.', 'error'); return; }
+  // Prevent duplicates
+  if (sites.some(s => s.name.toLowerCase() === name.toLowerCase())) {
+    showToast('A site with that name already exists.', 'error'); return;
+  }
+  await ref.sites().push({ name });
+  input.value = '';
+  showToast(`Site "${name}" added ✔`, 'success');
+}
+
+async function deleteSite(fbKey, name) {
+  if (!confirm(`Remove site "${name}"? This won't affect existing records.`)) return;
+  await ref.sites().child(fbKey).remove();
+  showToast(`Site "${name}" removed.`, 'success');
+}
+
+function renderSites() {
+  const container = document.getElementById('site-list');
+  if (!container) return;
+  if (!sites.length) {
+    container.innerHTML = '<div class="empty-state"><div class="empty-icon">📍</div><p>No sites yet. Add one above.</p></div>';
+    return;
+  }
+  const sorted = [...sites].sort((a, b) => a.name.localeCompare(b.name));
+  container.innerHTML = sorted.map(s => `
+    <div class="loan-item">
+      <div class="loan-info">
+        <h4 style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:16px">📍</span> ${s.name}
+        </h4>
+      </div>
+      <button class="loan-delete" onclick="deleteSite('${s._fbKey}', '${s.name.replace(/'/g,"\\'")}')">Remove</button>
+    </div>`).join('');
+}
+
+// Wire sites listener to also re-render the sites tab when open
+ref.sites().on('value', snap => {
+  const raw = snap.val();
+  sites = raw ? Object.entries(raw).map(([k, v]) => ({ _fbKey: k, name: v.name })) : [];
+  renderSites();
+});
 
 // ═══════════════════════════════════════════════════════════════
 // DROPDOWNS
